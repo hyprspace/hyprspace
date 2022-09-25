@@ -220,6 +220,7 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 			stream, err = host.NewStream(ctx, peer, p2p.Protocol)
 			if err != nil {
 				fmt.Println("[!] Failed to dial peer: " + peer.Pretty())
+				go p2p.Discover(ctx, host, dht, peerTable)
 				continue
 			}
 			stream.SetWriteDeadline(time.Now().Add(25 * time.Second))

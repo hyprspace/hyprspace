@@ -12,7 +12,7 @@ import (
 
 // Discover starts up a DHT based discovery system finding and adding nodes with the same rendezvous string.
 func Discover(ctx context.Context, h host.Host, dht *dht.IpfsDHT, peerTable map[string]peer.ID) {
-	ticker := time.NewTicker(time.Second * 5)
+	ticker := time.NewTicker(time.Second * 1)
 	defer ticker.Stop()
 
 	for {

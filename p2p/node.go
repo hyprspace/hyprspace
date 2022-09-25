@@ -64,9 +64,15 @@ func CreateNode(ctx context.Context, inputKey string, port int, handler network.
 		return
 	}
 
-	swarmKey, err := os.Open(os.Getenv("HYPRSPACE_SWARM_KEY"))
-	if err != nil {
-		return
+	var swarmKey *os.File
+	swarmKeyFile, ok := os.LookupEnv("HYPRSPACE_SWARM_KEY")
+	if ok {
+		fmt.Println("[+] Using swarm key " + swarmKeyFile)
+		swarmKey, err = os.Open(swarmKeyFile)
+		if err != nil {
+			return
+		}
+		defer swarmKey.Close()
 	}
 	extraBootstrapNodes := []string{}
 	ipfsApiStr, ok := os.LookupEnv("HYPRSPACE_IPFS_API")

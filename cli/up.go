@@ -372,7 +372,7 @@ func prettyDiscovery(ctx context.Context, node host.Host, peerTable map[string]p
 			if err != nil && (strings.HasPrefix(err.Error(), "failed to dial") ||
 				strings.HasPrefix(err.Error(), "no addresses")) {
 				// Attempt to connect to peers slowly when they aren't found.
-				time.Sleep(5 * time.Second)
+				time.Sleep(1 * time.Second)
 				continue
 			}
 			if err == nil {

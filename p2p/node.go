@@ -57,9 +57,9 @@ func getExtraBootstrapNodes(addr ma.Multiaddr) (nodesList []string) {
 }
 
 // CreateNode creates an internal Libp2p nodes and returns it and it's DHT Discovery service.
-func CreateNode(ctx context.Context, inputKey string, port int, handler network.StreamHandler) (node host.Host, dhtOut *dht.IpfsDHT, err error) {
+func CreateNode(ctx context.Context, inputKey []byte, port int, handler network.StreamHandler) (node host.Host, dhtOut *dht.IpfsDHT, err error) {
 	// Unmarshal Private Key
-	privateKey, err := crypto.UnmarshalPrivateKey([]byte(inputKey))
+	privateKey, err := crypto.UnmarshalPrivateKey(inputKey)
 	if err != nil {
 		return
 	}

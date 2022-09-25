@@ -10,6 +10,7 @@ import (
 	"github.com/hyprspace/hyprspace/config"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/crypto"
+	"github.com/multiformats/go-multibase"
 	"gopkg.in/yaml.v2"
 )
 
@@ -53,7 +54,7 @@ func InitRun(r *cmd.Root, c *cmd.Sub) {
 			ListenPort: 8001,
 			Address:    "10.1.1.1/24",
 			ID:         host.ID().Pretty(),
-			PrivateKey: string(keyBytes),
+			PrivateKey: multibase.MustNewEncoder(multibase.Base58BTC).Encode(keyBytes),
 		},
 	}
 

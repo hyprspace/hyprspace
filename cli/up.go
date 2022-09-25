@@ -23,6 +23,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/multiformats/go-multibase"
 	"github.com/nxadm/tail"
 )
 
@@ -132,10 +133,11 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 	port, err := verifyPort(cfg.Interface.ListenPort)
 	checkErr(err)
 
+	_, privateKey, err := multibase.Decode(cfg.Interface.PrivateKey)
 	// Create P2P Node
 	host, dht, err := p2p.CreateNode(
 		ctx,
-		cfg.Interface.PrivateKey,
+		privateKey,
 		port,
 		streamHandler,
 	)

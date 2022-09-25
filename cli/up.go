@@ -203,6 +203,7 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 				// If everyting succeeds continue on to the next packet.
 				_, err = stream.Write(packet[:plen])
 				if err == nil {
+					stream.SetWriteDeadline(time.Now().Add(25 * time.Second))
 					continue
 				}
 			}
@@ -215,10 +216,13 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 		// Check if the destination of the packet is a known peer to
 		// the interface.
 		if peer, ok := peerTable[dst]; ok {
+			fmt.Println("[-] Connecting to peer: " + peer.Pretty())
 			stream, err = host.NewStream(ctx, peer, p2p.Protocol)
 			if err != nil {
+				fmt.Println("[!] Failed to dial peer: " + peer.Pretty())
 				continue
 			}
+			stream.SetWriteDeadline(time.Now().Add(25 * time.Second))
 			// Write packet length
 			err = binary.Write(stream, binary.LittleEndian, uint16(plen))
 			if err != nil {
@@ -357,6 +361,7 @@ func streamHandler(stream network.Stream) {
 				return
 			}
 		}
+		stream.SetWriteDeadline(time.Now().Add(25 * time.Second))
 		tunDev.Iface.Write(packet[:size])
 	}
 }

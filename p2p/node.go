@@ -172,6 +172,7 @@ func bootstrap(ctx context.Context, node host.Host, bootstrapPeers map[peer.ID]*
 	for _, peerInfo := range bootstrapPeers {
 		go func(peerInfo *peer.AddrInfo) {
 			defer wg.Done()
+			node.Network().ClosePeer(peerInfo.ID)
 			err := node.Connect(ctx, *peerInfo)
 			if err == nil {
 				lock.Lock()

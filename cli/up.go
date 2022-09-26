@@ -172,7 +172,7 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 		checkErr(errors.New("unable to bring up tun device"))
 	}
 
-	fmt.Println("[+] Network Setup Complete...Waiting on Node Discovery")
+	fmt.Println("[+] Network setup complete")
 
 	// + ----------------------------------------+
 	// | Listen For New Packets on TUN Interface |

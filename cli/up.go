@@ -216,10 +216,9 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 		// Check if the destination of the packet is a known peer to
 		// the interface.
 		if peer, ok := peerTable[dst]; ok {
-			fmt.Println("[-] Connecting to peer: " + peer.Pretty())
 			stream, err = host.NewStream(ctx, peer, p2p.Protocol)
 			if err != nil {
-				fmt.Println("[!] Failed to dial peer: " + peer.Pretty())
+				fmt.Println("[!] Failed to open stream to " + dst)
 				go p2p.Rediscover(discoverNow)
 				continue
 			}

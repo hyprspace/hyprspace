@@ -32,11 +32,11 @@ func Discover(ctx context.Context, h host.Host, dht *dht.IpfsDHT, peerTable map[
 					if err != nil {
 						continue
 					}
-					_, err = h.Network().DialPeer(ctx, addrs.ID)
+					conn, err := h.Network().DialPeer(ctx, addrs.ID)
 					if err != nil {
 						continue
 					}
-					fmt.Println("[+] Connected to " + nd)
+					fmt.Printf("[+] Connected to %s at %s\n", nd, conn.RemoteMultiaddr())
 				}
 			}
 			dur = dur * 2

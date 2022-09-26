@@ -153,8 +153,8 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 	fmt.Println("[+] Setting Up Node Discovery via DHT")
 
 	// Setup P2P Discovery
-	go p2p.Discover(ctx, host, dht, peerTable)
-	go prettyDiscovery(ctx, host, peerTable)
+	discoverNow := make(chan bool)
+	go p2p.Discover(ctx, host, dht, peerTable, discoverNow)
 
 	// Configure path for lock
 	lockPath := filepath.Join(filepath.Dir(cfg.Path), cfg.Interface.Name+".lock")
@@ -220,7 +220,7 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 			stream, err = host.NewStream(ctx, peer, p2p.Protocol)
 			if err != nil {
 				fmt.Println("[!] Failed to dial peer: " + peer.Pretty())
-				go p2p.Discover(ctx, host, dht, peerTable)
+				go p2p.Rediscover(discoverNow)
 				continue
 			}
 			stream.SetWriteDeadline(time.Now().Add(25 * time.Second))
@@ -364,31 +364,6 @@ func streamHandler(stream network.Stream) {
 		}
 		stream.SetWriteDeadline(time.Now().Add(25 * time.Second))
 		tunDev.Iface.Write(packet[:size])
-	}
-}
-
-func prettyDiscovery(ctx context.Context, node host.Host, peerTable map[string]peer.ID) {
-	// Build a temporary map of peers to limit querying to only those
-	// not connected.
-	tempTable := make(map[string]peer.ID, len(peerTable))
-	for ip, id := range peerTable {
-		tempTable[ip] = id
-	}
-	for len(tempTable) > 0 {
-		for ip, id := range tempTable {
-			stream, err := node.NewStream(ctx, id, p2p.Protocol)
-			if err != nil && (strings.HasPrefix(err.Error(), "failed to dial") ||
-				strings.HasPrefix(err.Error(), "no addresses")) {
-				// Attempt to connect to peers slowly when they aren't found.
-				time.Sleep(1 * time.Second)
-				continue
-			}
-			if err == nil {
-				fmt.Printf("[+] Connection to %s Successful. Network Ready.\n", ip)
-				stream.Close()
-			}
-			delete(tempTable, ip)
-		}
 	}
 }
 

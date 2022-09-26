@@ -157,7 +157,7 @@ func CreateNode(ctx context.Context, inputKey []byte, port int, handler network.
 	count := bootstrap(ctx, node, BootstrapPeers)
 
 	if count < 1 {
-		return node, dhtOut, errors.New("unable to bootstrap libp2p node")
+		fmt.Println("[!] Initial bootstrap failed")
 	}
 
 	go rebootstrap(ctx, node, BootstrapPeers)

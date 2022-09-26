@@ -9,7 +9,9 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/signal"
 	"sync"
+	"syscall"
 
 	"github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p"
@@ -26,6 +28,8 @@ import (
 
 // Protocol is a descriptor for the Hyprspace P2P Protocol.
 const Protocol = "/hyprspace/0.0.1"
+
+var bootstrapTriggerChan = make(chan bool)
 
 func getExtraBootstrapNodes(addr ma.Multiaddr) (nodesList []string) {
 	nodesList = []string{}
@@ -150,11 +154,22 @@ func CreateNode(ctx context.Context, inputKey []byte, port int, handler network.
 
 	// Let's connect to the bootstrap nodes first. They will tell us about the
 	// other nodes in the network.
+	count := bootstrap(ctx, node, BootstrapPeers)
+
+	if count < 1 {
+		return node, dhtOut, errors.New("unable to bootstrap libp2p node")
+	}
+
+	go rebootstrap(ctx, node, BootstrapPeers)
+	return node, dhtOut, nil
+}
+
+func bootstrap(ctx context.Context, node host.Host, bootstrapPeers map[peer.ID]*peer.AddrInfo) int {
 	var wg sync.WaitGroup
 	lock := sync.Mutex{}
 	count := 0
-	wg.Add(len(BootstrapPeers))
-	for _, peerInfo := range BootstrapPeers {
+	wg.Add(len(bootstrapPeers))
+	for _, peerInfo := range bootstrapPeers {
 		go func(peerInfo *peer.AddrInfo) {
 			defer wg.Done()
 			err := node.Connect(ctx, *peerInfo)
@@ -167,11 +182,28 @@ func CreateNode(ctx context.Context, inputKey []byte, port int, handler network.
 		}(peerInfo)
 	}
 	wg.Wait()
-
-	if count < 1 {
-		return node, dhtOut, errors.New("unable to bootstrap libp2p node")
-	}
 	fmt.Printf("[+] Connected to %d bootstrap peers\n", count)
+	return count
+}
 
-	return node, dhtOut, nil
+func rebootstrap(ctx context.Context, node host.Host, bootstrapPeers map[peer.ID]*peer.AddrInfo) {
+	signalCh := make(chan os.Signal, 1)
+	signal.Notify(signalCh, syscall.SIGUSR1)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-bootstrapTriggerChan:
+			bootstrap(ctx, node, bootstrapPeers)
+		case <-signalCh:
+			fmt.Println("[-] Rebootstrapping on SIGUSR1")
+			bootstrap(ctx, node, bootstrapPeers)
+			Rediscover()
+		}
+	}
+}
+
+func Rebootstrap() {
+	bootstrapTriggerChan <- true
 }

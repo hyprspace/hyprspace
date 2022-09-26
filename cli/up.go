@@ -153,8 +153,7 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 	fmt.Println("[+] Setting Up Node Discovery via DHT")
 
 	// Setup P2P Discovery
-	discoverNow := make(chan bool)
-	go p2p.Discover(ctx, host, dht, peerTable, discoverNow)
+	go p2p.Discover(ctx, host, dht, peerTable)
 
 	// Configure path for lock
 	lockPath := filepath.Join(filepath.Dir(cfg.Path), cfg.Interface.Name+".lock")
@@ -219,7 +218,7 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 			stream, err = host.NewStream(ctx, peer, p2p.Protocol)
 			if err != nil {
 				fmt.Println("[!] Failed to open stream to " + dst)
-				go p2p.Rediscover(discoverNow)
+				go p2p.Rediscover()
 				continue
 			}
 			stream.SetWriteDeadline(time.Now().Add(25 * time.Second))

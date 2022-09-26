@@ -11,8 +11,10 @@ import (
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 )
 
+var discoverNow = make(chan bool)
+
 // Discover starts up a DHT based discovery system finding and adding nodes with the same rendezvous string.
-func Discover(ctx context.Context, h host.Host, dht *dht.IpfsDHT, peerTable map[string]peer.ID, discoverNow chan bool) {
+func Discover(ctx context.Context, h host.Host, dht *dht.IpfsDHT, peerTable map[string]peer.ID) {
 	dur := time.Second * 1
 	ticker := time.NewTicker(dur)
 	defer ticker.Stop()
@@ -26,6 +28,7 @@ func Discover(ctx context.Context, h host.Host, dht *dht.IpfsDHT, peerTable map[
 			// Immediately trigger discovery
 			ticker.Reset(time.Millisecond * 1)
 		case <-ticker.C:
+			connectedToAny := false
 			for nd, id := range peerTable {
 				if h.Network().Connectedness(id) != network.Connected {
 					addrs, err := dht.FindPeer(ctx, id)
@@ -37,17 +40,27 @@ func Discover(ctx context.Context, h host.Host, dht *dht.IpfsDHT, peerTable map[
 						continue
 					}
 					fmt.Printf("[+] Connected to %s at %s\n", nd, conn.RemoteMultiaddr())
+					connectedToAny = true
+				} else {
+					connectedToAny = true
 				}
 			}
-			dur = dur * 2
-			if dur >= time.Second*60 {
-				dur = time.Second * 60
+			if !connectedToAny {
+				fmt.Println("[!] Not connected to any peers, attempting to bootstrap again")
+				Rebootstrap()
+				dur = time.Second * 1
+				ticker.Reset(dur)
+			} else {
+				dur = dur * 2
+				if dur >= time.Second*60 {
+					dur = time.Second * 60
+				}
+				ticker.Reset(dur)
 			}
-			ticker.Reset(dur)
 		}
 	}
 }
 
-func Rediscover(discoverNow chan bool) {
+func Rediscover() {
 	discoverNow <- true
 }

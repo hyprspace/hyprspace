@@ -39,6 +39,9 @@ func getExtraBootstrapNodes(addr ma.Multiaddr) (nodesList []string) {
 	}
 	resp, err := http.PostForm("http://"+ip4+":"+port+"/api/v0/swarm/addrs", url.Values{})
 
+	if err != nil {
+		return
+	}
 	defer resp.Body.Close()
 
 	apiResponse, err := ioutil.ReadAll(resp.Body)
@@ -81,6 +84,7 @@ func CreateNode(ctx context.Context, inputKey []byte, port int, handler network.
 		if err == nil {
 			fmt.Println("[+] Getting additional peers from IPFS API")
 			extraBootstrapNodes = getExtraBootstrapNodes(ipfsApiAddr)
+			fmt.Printf("[+] %d additional addresses\n", len(extraBootstrapNodes))
 		}
 	}
 
@@ -167,6 +171,7 @@ func CreateNode(ctx context.Context, inputKey []byte, port int, handler network.
 	if count < 1 {
 		return node, dhtOut, errors.New("unable to bootstrap libp2p node")
 	}
+	fmt.Printf("[+] Connected to %d bootstrap peers\n", count)
 
 	return node, dhtOut, nil
 }

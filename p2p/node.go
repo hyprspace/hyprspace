@@ -8,11 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/signal"
-	"sync"
-	"syscall"
 
-	"github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/host"
@@ -80,16 +76,6 @@ func CreateNode(ctx context.Context, inputKey []byte, port int, handler network.
 		}
 		defer swarmKey.Close()
 	}
-	extraBootstrapNodes := []string{}
-	ipfsApiStr, ok := os.LookupEnv("HYPRSPACE_IPFS_API")
-	if ok {
-		ipfsApiAddr, err := ma.NewMultiaddr(ipfsApiStr)
-		if err == nil {
-			fmt.Println("[+] Getting additional peers from IPFS API")
-			extraBootstrapNodes = getExtraBootstrapNodes(ipfsApiAddr)
-			fmt.Printf("[+] %d additional addresses\n", len(extraBootstrapNodes))
-		}
-	}
 
 	ip6quic := fmt.Sprintf("/ip6/::/udp/%d/quic", port)
 	ip4quic := fmt.Sprintf("/ip4/0.0.0.0/udp/%d/quic", port)
@@ -121,9 +107,6 @@ func CreateNode(ctx context.Context, inputKey []byte, port int, handler network.
 	// Setup Hyprspace Stream Handler
 	node.SetStreamHandler(Protocol, handler)
 
-	// Create DHT Subsystem
-	dhtOut = dht.NewDHTClient(ctx, node, datastore.NewMapDatastore())
-
 	// Define Bootstrap Nodes.
 	peers := []string{
 		"/ip4/168.235.67.108/tcp/4001/p2p/QmRMA5pWXtfuW1y5w2t9gYxrDDD6bPRLKdWAYnHTeCxZMm",
@@ -133,77 +116,55 @@ func CreateNode(ctx context.Context, inputKey []byte, port int, handler network.
 	}
 
 	// Convert Bootstap Nodes into usable addresses.
-	BootstrapPeers := make(map[peer.ID]*peer.AddrInfo, len(peers))
-	for _, addrStr := range append(peers, extraBootstrapNodes...) {
-		addr, err := ma.NewMultiaddr(addrStr)
-		if err != nil {
-			return node, dhtOut, err
-		}
-		pii, err := peer.AddrInfoFromP2pAddr(addr)
-		if err != nil {
-			return node, dhtOut, err
-		}
-		pi, ok := BootstrapPeers[pii.ID]
-		if !ok {
-			pi = &peer.AddrInfo{ID: pii.ID}
-			BootstrapPeers[pi.ID] = pi
-		}
-		pi.Addrs = append(pi.Addrs, pii.Addrs...)
+	staticBootstrapPeers, err := parsePeerAddrs(peers)
+	if err != nil {
+		return node, nil, err
 	}
 
-	// Let's connect to the bootstrap nodes first. They will tell us about the
-	// other nodes in the network.
-	count := bootstrap(ctx, node, BootstrapPeers)
+	// Create DHT Subsystem
+	dhtOut, err = dht.New(
+		ctx,
+		node,
+		dht.Mode(dht.ModeAuto),
+		dht.BootstrapPeers(staticBootstrapPeers...),
+		dht.BootstrapPeersFunc(func() []peer.AddrInfo {
+			extraBootstrapNodes := []string{}
+			ipfsApiStr, ok := os.LookupEnv("HYPRSPACE_IPFS_API")
+			if ok {
+				ipfsApiAddr, err := ma.NewMultiaddr(ipfsApiStr)
+				if err == nil {
+					fmt.Println("[+] Getting additional peers from IPFS API")
+					extraBootstrapNodes = getExtraBootstrapNodes(ipfsApiAddr)
+					fmt.Printf("[+] %d additional addresses\n", len(extraBootstrapNodes))
+				}
+			}
+			dynamicBootstrapPeers, err := parsePeerAddrs(extraBootstrapNodes)
+			if err != nil {
+				return staticBootstrapPeers
+			} else {
+				return append(staticBootstrapPeers, dynamicBootstrapPeers...)
+			}
+		}),
+	)
 
-	if count < 1 {
-		fmt.Println("[!] Initial bootstrap failed")
+	if err != nil {
+		return node, nil, err
 	}
 
-	go rebootstrap(ctx, node, BootstrapPeers)
 	return node, dhtOut, nil
 }
 
-func bootstrap(ctx context.Context, node host.Host, bootstrapPeers map[peer.ID]*peer.AddrInfo) int {
-	var wg sync.WaitGroup
-	lock := sync.Mutex{}
-	count := 0
-	wg.Add(len(bootstrapPeers))
-	for _, peerInfo := range bootstrapPeers {
-		go func(peerInfo *peer.AddrInfo) {
-			defer wg.Done()
-			node.Network().ClosePeer(peerInfo.ID)
-			err := node.Connect(ctx, *peerInfo)
-			if err == nil {
-				lock.Lock()
-				count++
-				lock.Unlock()
-
-			}
-		}(peerInfo)
-	}
-	wg.Wait()
-	fmt.Printf("[+] Connected to %d bootstrap peers\n", count)
-	return count
-}
-
-func rebootstrap(ctx context.Context, node host.Host, bootstrapPeers map[peer.ID]*peer.AddrInfo) {
-	signalCh := make(chan os.Signal, 1)
-	signal.Notify(signalCh, syscall.SIGUSR1)
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-bootstrapTriggerChan:
-			bootstrap(ctx, node, bootstrapPeers)
-		case <-signalCh:
-			fmt.Println("[-] Rebootstrapping on SIGUSR1")
-			bootstrap(ctx, node, bootstrapPeers)
-			Rediscover()
+func parsePeerAddrs(peers []string) (addrs []peer.AddrInfo, err error) {
+	for _, addrStr := range peers {
+		addr, err := ma.NewMultiaddr(addrStr)
+		if err != nil {
+			return nil, err
 		}
+		pii, err := peer.AddrInfoFromP2pAddr(addr)
+		if err != nil {
+			return nil, err
+		}
+		addrs = append(addrs, *pii)
 	}
-}
-
-func Rebootstrap() {
-	bootstrapTriggerChan <- true
+	return addrs, nil
 }

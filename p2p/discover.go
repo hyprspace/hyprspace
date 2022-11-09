@@ -47,7 +47,8 @@ func Discover(ctx context.Context, h host.Host, dht *dht.IpfsDHT, peerTable map[
 			}
 			if !connectedToAny {
 				fmt.Println("[!] Not connected to any peers, attempting to bootstrap again")
-				Rebootstrap()
+				dht.Bootstrap(ctx)
+				dht.RefreshRoutingTable()
 				dur = time.Second * 1
 				ticker.Reset(dur)
 			} else {

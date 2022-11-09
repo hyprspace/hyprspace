@@ -23,6 +23,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/multiformats/go-multibase"
 	"github.com/nxadm/tail"
 )
@@ -158,8 +159,8 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 	// Configure path for lock
 	lockPath := filepath.Join(filepath.Dir(cfg.Path), cfg.Interface.Name+".lock")
 
-	// Register the application to listen for SIGINT/SIGTERM
-	go signalExit(host, lockPath)
+	// Register the application to listen for signals
+	go signalHandler(host, lockPath, dht)
 
 	// Write lock to filesystem to indicate an existing running daemon.
 	err = os.WriteFile(lockPath, []byte(fmt.Sprint(os.Getpid())), os.ModePerm)
@@ -259,27 +260,33 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 	}
 }
 
-// singalExit registers two syscall handlers on the system  so that if
-// an SIGINT or SIGTERM occur on the system hyprspace can gracefully
-// shutdown and remove the filesystem lock file.
-func signalExit(host host.Host, lockPath string) {
-	// Wait for a SIGINT or SIGTERM signal
-	ch := make(chan os.Signal, 1)
-	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
-	<-ch
+func signalHandler(host host.Host, lockPath string, dht *dht.IpfsDHT) {
+	exitCh := make(chan os.Signal, 1)
+	rebootstrapCh := make(chan os.Signal, 1)
+	signal.Notify(exitCh, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(rebootstrapCh, syscall.SIGUSR1)
 
-	// Shut the node down
-	err := host.Close()
-	checkErr(err)
+	for {
+		select {
+		case <-rebootstrapCh:
+			fmt.Println("[-] Rebootstrapping on SIGUSR1")
+			<-dht.ForceRefresh()
+			p2p.Rediscover()
+		case <-exitCh:
+			// Shut the node down
+			err := host.Close()
+			checkErr(err)
 
-	// Remove daemon lock from file system.
-	err = os.Remove(lockPath)
-	checkErr(err)
+			// Remove daemon lock from file system.
+			err = os.Remove(lockPath)
+			checkErr(err)
 
-	fmt.Println("Received signal, shutting down...")
+			fmt.Println("Received signal, shutting down...")
 
-	// Exit the application.
-	os.Exit(0)
+			// Exit the application.
+			os.Exit(0)
+		}
+	}
 }
 
 // createDaemon handles creating an independent background process for a

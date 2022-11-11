@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"os"
+	"time"
 
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/crypto"
@@ -17,6 +19,8 @@ import (
 	"github.com/libp2p/go-libp2p-core/pnet"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	libp2pquic "github.com/libp2p/go-libp2p-quic-transport"
+	"github.com/libp2p/go-libp2p/p2p/discovery/backoff"
+	"github.com/libp2p/go-libp2p/p2p/host/autorelay"
 	"github.com/libp2p/go-tcp-transport"
 	ma "github.com/multiformats/go-multiaddr"
 )
@@ -85,6 +89,8 @@ func CreateNode(ctx context.Context, inputKey []byte, port int, handler network.
 
 	key, _ := pnet.DecodeV1PSK(swarmKey)
 
+	peerChan := make(chan peer.AddrInfo)
+
 	// Create libp2p node
 	node, err = libp2p.New(
 		libp2p.PrivateNetwork(key),
@@ -98,6 +104,32 @@ func CreateNode(ctx context.Context, inputKey []byte, port int, handler network.
 		libp2p.EnableHolePunching(),
 		libp2p.EnableRelayService(),
 		libp2p.EnableNATService(),
+		libp2p.EnableAutoRelay(
+			autorelay.WithNumRelays(2),
+			autorelay.WithPeerSource(func(ctx context.Context, numPeers int) <-chan peer.AddrInfo {
+				r := make(chan peer.AddrInfo)
+				go func() {
+					defer close(r)
+					for ; numPeers != 0; numPeers-- {
+						select {
+						case v, ok := <-peerChan:
+							if !ok {
+								return
+							}
+							select {
+							case r <- v:
+							case <-ctx.Done():
+								return
+							}
+						case <-ctx.Done():
+							return
+						}
+					}
+				}()
+				return r
+			}, time.Second*1),
+		),
+		libp2p.WithDialTimeout(time.Second*5),
 		libp2p.FallbackDefaults,
 	)
 	if err != nil {
@@ -150,6 +182,18 @@ func CreateNode(ctx context.Context, inputKey []byte, port int, handler network.
 	if err != nil {
 		return node, nil, err
 	}
+
+	// Continuously feed peers into the AutoRelay service
+	go func() {
+		delay := backoff.NewExponentialDecorrelatedJitter(time.Second, time.Second*60, 5.0, rand.NewSource(time.Now().UnixMilli()))()
+		for {
+			for _, p := range node.Network().Peers() {
+				pi := node.Network().Peerstore().PeerInfo(p)
+				peerChan <- pi
+			}
+			time.Sleep(delay.Delay())
+		}
+	}()
 
 	return node, dhtOut, nil
 }

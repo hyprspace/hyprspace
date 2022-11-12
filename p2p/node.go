@@ -70,15 +70,18 @@ func CreateNode(ctx context.Context, inputKey []byte, port int, handler network.
 		return
 	}
 
-	var swarmKey *os.File
+	maybePrivateNet := libp2p.ChainOptions()
 	swarmKeyFile, ok := os.LookupEnv("HYPRSPACE_SWARM_KEY")
 	if ok {
 		fmt.Println("[+] Using swarm key " + swarmKeyFile)
+		var swarmKey *os.File
 		swarmKey, err = os.Open(swarmKeyFile)
 		if err != nil {
 			return
 		}
 		defer swarmKey.Close()
+		key, _ := pnet.DecodeV1PSK(swarmKey)
+		maybePrivateNet = libp2p.PrivateNetwork(key)
 	}
 
 	ip6quic := fmt.Sprintf("/ip6/::/udp/%d/quic", port)
@@ -87,13 +90,11 @@ func CreateNode(ctx context.Context, inputKey []byte, port int, handler network.
 	ip6tcp := fmt.Sprintf("/ip6/::/tcp/%d", port)
 	ip4tcp := fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", port)
 
-	key, _ := pnet.DecodeV1PSK(swarmKey)
-
 	peerChan := make(chan peer.AddrInfo)
 
 	// Create libp2p node
 	node, err = libp2p.New(
-		libp2p.PrivateNetwork(key),
+		maybePrivateNet,
 		libp2p.ListenAddrStrings(ip6tcp, ip4tcp, ip4quic, ip6quic),
 		libp2p.Identity(privateKey),
 		libp2p.DefaultSecurity,

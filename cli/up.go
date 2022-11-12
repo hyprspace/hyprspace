@@ -144,6 +144,12 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 	)
 	checkErr(err)
 
+	for _, id := range cfg.Peers {
+		p, err := peer.Decode(id.ID)
+		checkErr(err)
+		host.ConnManager().Protect(p, "/hyprspace/peer")
+	}
+
 	// Setup Peer Table for Quick Packet --> Dest ID lookup
 	peerTable := make(map[string]peer.ID)
 	for ip, id := range cfg.Peers {
@@ -270,6 +276,7 @@ func signalHandler(host host.Host, lockPath string, dht *dht.IpfsDHT) {
 		select {
 		case <-rebootstrapCh:
 			fmt.Println("[-] Rebootstrapping on SIGUSR1")
+			host.ConnManager().TrimOpenConns(context.Background())
 			<-dht.ForceRefresh()
 			p2p.Rediscover()
 		case <-exitCh:

@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"time"
 
+	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
-	dht "github.com/libp2p/go-libp2p-kad-dht"
 )
 
 var discoverNow = make(chan bool)
@@ -29,17 +29,16 @@ func Discover(ctx context.Context, h host.Host, dht *dht.IpfsDHT, peerTable map[
 			ticker.Reset(time.Millisecond * 1)
 		case <-ticker.C:
 			connectedToAny := false
-			for nd, id := range peerTable {
+			for _, id := range peerTable {
 				if h.Network().Connectedness(id) != network.Connected {
 					addrs, err := dht.FindPeer(ctx, id)
 					if err != nil {
 						continue
 					}
-					conn, err := h.Network().DialPeer(ctx, addrs.ID)
+					_, err = h.Network().DialPeer(ctx, addrs.ID)
 					if err != nil {
 						continue
 					}
-					fmt.Printf("[+] Connected to %s at %s\n", nd, conn.RemoteMultiaddr())
 					connectedToAny = true
 				} else {
 					connectedToAny = true

@@ -21,6 +21,7 @@ import (
 	"github.com/hyprspace/hyprspace/p2p"
 	"github.com/hyprspace/hyprspace/tun"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
+	"github.com/libp2p/go-libp2p/core/event"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -168,6 +169,9 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 	// Register the application to listen for signals
 	go signalHandler(host, lockPath, dht)
 
+	// Log about various events
+	go eventLogger(host, cfg)
+
 	// Write lock to filesystem to indicate an existing running daemon.
 	err = os.WriteFile(lockPath, []byte(fmt.Sprint(os.Getpid())), os.ModePerm)
 	checkErr(err)
@@ -292,6 +296,29 @@ func signalHandler(host host.Host, lockPath string, dht *dht.IpfsDHT) {
 
 			// Exit the application.
 			os.Exit(0)
+		}
+	}
+}
+
+func eventLogger(host host.Host, cfg *config.Config) {
+	subCon, err := host.EventBus().Subscribe(new(event.EvtPeerConnectednessChanged))
+	checkErr(err)
+	for {
+		select {
+		case ev := <-subCon.Out():
+			evt := ev.(event.EvtPeerConnectednessChanged)
+			for vpnIp, vpnPeer := range cfg.Peers {
+				if vpnPeer.ID == evt.Peer.Pretty() {
+					if evt.Connectedness == network.Connected {
+						for _, c := range host.Network().ConnsToPeer(evt.Peer) {
+							fmt.Printf("[+] Connected to %s at %s/p2p/%s\n", vpnIp, c.RemoteMultiaddr().String(), evt.Peer.Pretty())
+						}
+					} else if evt.Connectedness == network.NotConnected {
+						fmt.Printf("[!] Disconnected from %s\n", vpnIp)
+					}
+					break
+				}
+			}
 		}
 	}
 }

@@ -158,7 +158,7 @@ func CreateNode(ctx context.Context, inputKey []byte, port int, handler network.
 	dhtOut, err = dht.New(
 		ctx,
 		node,
-		dht.Mode(dht.ModeAuto),
+		dht.Mode(dht.ModeClient),
 		dht.BootstrapPeers(staticBootstrapPeers...),
 		dht.BootstrapPeersFunc(func() []peer.AddrInfo {
 			extraBootstrapNodes := []string{}

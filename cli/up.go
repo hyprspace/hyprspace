@@ -12,7 +12,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
-	"strings"
 	"syscall"
 	"time"
 
@@ -26,7 +25,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multibase"
-	"github.com/nxadm/tail"
 )
 
 var (
@@ -65,9 +63,6 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 	// Parse Command Args
 	args := c.Args.(*UpArgs)
 
-	// Parse Command Flags
-	flags := c.Flags.(*UpFlags)
-
 	// Parse Global Config Flag for Custom Config Path
 	configPath := r.Flags.(*GlobalFlags).Config
 	if configPath == "" {
@@ -77,16 +72,6 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 	// Read in configuration from file.
 	cfg, err := config.Read(configPath)
 	checkErr(err)
-
-	if !flags.Foreground {
-		if err := createDaemon(cfg); err != nil {
-			fmt.Println("[+] Failed to Create Hyprspace Daemon")
-			fmt.Println(err)
-		} else {
-			fmt.Println("[+] Successfully Created Hyprspace Daemon")
-		}
-		return
-	}
 
 	// Setup reverse lookup hash map for authentication.
 	RevLookup = make(map[string]string, len(cfg.Peers))
@@ -321,72 +306,6 @@ func eventLogger(host host.Host, cfg *config.Config) {
 			}
 		}
 	}
-}
-
-// createDaemon handles creating an independent background process for a
-// Hyprspace daemon from the original parent process.
-func createDaemon(cfg *config.Config) error {
-	path, err := os.Executable()
-	checkErr(err)
-
-	// Generate log path
-	logPath := filepath.Join(filepath.Dir(cfg.Path), cfg.Interface.Name+".log")
-
-	// Create Pipe to monitor for daemon output.
-	f, err := os.Create(logPath)
-	checkErr(err)
-
-	// Create Sub Process
-	process, err := os.StartProcess(
-		path,
-		append(os.Args, "--foreground"),
-		&os.ProcAttr{
-			Dir:   ".",
-			Env:   os.Environ(),
-			Files: []*os.File{nil, f, f},
-		},
-	)
-	checkErr(err)
-
-	// Listen to the child process's log output to determine
-	// when the daemon is setup and connected to a set of peers.
-	count := 0
-	deadlineHit := false
-	countChan := make(chan int)
-	go func(out chan<- int) {
-		numConnected := 0
-		t, err := tail.TailFile(logPath, tail.Config{Follow: true})
-		if err != nil {
-			out <- numConnected
-			return
-		}
-		for line := range t.Lines {
-			fmt.Println(line.Text)
-			if strings.HasPrefix(line.Text, "[+] Connection to") {
-				numConnected++
-				if numConnected >= len(cfg.Peers) {
-					break
-				}
-			}
-		}
-		out <- numConnected
-	}(countChan)
-
-	// Block until all clients are connected or for a maximum of 30s.
-	select {
-	case _, deadlineHit = <-time.After(30 * time.Second):
-	case count = <-countChan:
-	}
-
-	// Release the created daemon
-	err = process.Release()
-	checkErr(err)
-
-	// Check if the daemon exited prematurely
-	if !deadlineHit && count < len(cfg.Peers) {
-		return errors.New("failed to create daemon")
-	}
-	return nil
 }
 
 func streamHandler(stream network.Stream) {

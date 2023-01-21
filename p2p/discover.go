@@ -24,7 +24,7 @@ func Discover(ctx context.Context, h host.Host, dht *dht.IpfsDHT, peerTable map[
 		case <-ctx.Done():
 			return
 		case <-discoverNow:
-			dur = time.Second * 1
+			dur = time.Second * 3
 			// Immediately trigger discovery
 			ticker.Reset(time.Millisecond * 1)
 		case <-ticker.C:
@@ -48,7 +48,7 @@ func Discover(ctx context.Context, h host.Host, dht *dht.IpfsDHT, peerTable map[
 				fmt.Println("[!] Not connected to any peers, attempting to bootstrap again")
 				dht.Bootstrap(ctx)
 				dht.RefreshRoutingTable()
-				dur = time.Second * 1
+				dur = time.Second * 10
 				ticker.Reset(dur)
 			} else {
 				dur = dur * 2

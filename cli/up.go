@@ -135,6 +135,7 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 		streamHandler,
 	)
 	checkErr(err)
+	host.SetStreamHandler(p2p.PeXProtocol, p2p.NewPeXStreamHandler(host, cfg))
 
 	for _, id := range cfg.Peers {
 		p, err := peer.Decode(id.ID)
@@ -156,6 +157,9 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 
 	// Configure path for lock
 	lockPath := filepath.Join(filepath.Dir(cfg.Path), cfg.Interface.Name+".lock")
+
+	// PeX
+	go p2p.PeXService(ctx, host, cfg)
 
 	// Register the application to listen for signals
 	go signalHandler(ctx, host, lockPath, dht)

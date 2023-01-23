@@ -29,7 +29,8 @@ import (
 )
 
 var (
-	cfg *config.Config
+	cfg  *config.Config
+	node host.Host
 	// iface is the tun device used to pass packets between
 	// Hyprspace and the user's machine.
 	tunDev *tun.TUN
@@ -108,6 +109,7 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 	)
 	checkErr(err)
 	host.SetStreamHandler(p2p.PeXProtocol, p2p.NewPeXStreamHandler(host, cfg))
+	node = host
 
 	for _, p := range cfg.Peers {
 		host.ConnManager().Protect(p.ID, "/hyprspace/peer")
@@ -189,51 +191,55 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 			continue
 		}
 
-		// Check if we already have an open connection to the destination peer.
-		stream, ok := activeStreams[dst.ID]
-		if ok {
-			// Write out the packet's length to the libp2p stream to ensure
-			// we know the full size of the packet at the other end.
-			err = binary.Write(stream, binary.LittleEndian, uint16(plen))
-			if err == nil {
-				// Write the packet out to the libp2p stream.
-				// If everyting succeeds continue on to the next packet.
-				_, err = stream.Write(packet[:plen])
-				if err == nil {
-					stream.SetWriteDeadline(time.Now().Add(25 * time.Second))
-					continue
-				}
-			}
-			// If we encounter an error when writing to a stream we should
-			// close that stream and delete it from the active stream map.
-			stream.Close()
-			delete(activeStreams, dst.ID)
-		}
-
-		stream, err = host.NewStream(ctx, dst.ID, p2p.Protocol)
-		if err != nil {
-			fmt.Println("[!] Failed to open stream to " + dst.ID.String())
-			go p2p.Rediscover()
-			continue
-		}
-		stream.SetWriteDeadline(time.Now().Add(25 * time.Second))
-		// Write packet length
-		err = binary.Write(stream, binary.LittleEndian, uint16(plen))
-		if err != nil {
-			stream.Close()
-			continue
-		}
-		// Write the packet
-		_, err = stream.Write(packet[:plen])
-		if err != nil {
-			stream.Close()
-			continue
-		}
-
-		// If all succeeds when writing the packet to the stream
-		// we should reuse this stream by adding it active streams map.
-		activeStreams[dst.ID] = stream
+		sendPacket(*dst, packet, plen)
 	}
+}
+
+func sendPacket(dst config.Peer, packet []byte, plen int) {
+	// Check if we already have an open connection to the destination peer.
+	stream, ok := activeStreams[dst.ID]
+	if ok {
+		// Write out the packet's length to the libp2p stream to ensure
+		// we know the full size of the packet at the other end.
+		err := binary.Write(stream, binary.LittleEndian, uint16(plen))
+		if err == nil {
+			// Write the packet out to the libp2p stream.
+			// If everyting succeeds continue on to the next packet.
+			_, err = stream.Write(packet[:plen])
+			if err == nil {
+				stream.SetWriteDeadline(time.Now().Add(25 * time.Second))
+				return
+			}
+		}
+		// If we encounter an error when writing to a stream we should
+		// close that stream and delete it from the active stream map.
+		stream.Close()
+		delete(activeStreams, dst.ID)
+	}
+
+	stream, err := node.NewStream(ctx, dst.ID, p2p.Protocol)
+	if err != nil {
+		fmt.Println("[!] Failed to open stream to " + dst.ID.String())
+		go p2p.Rediscover()
+		return
+	}
+	stream.SetWriteDeadline(time.Now().Add(25 * time.Second))
+	// Write packet length
+	err = binary.Write(stream, binary.LittleEndian, uint16(plen))
+	if err != nil {
+		stream.Close()
+		return
+	}
+	// Write the packet
+	_, err = stream.Write(packet[:plen])
+	if err != nil {
+		stream.Close()
+		return
+	}
+
+	// If all succeeds when writing the packet to the stream
+	// we should reuse this stream by adding it active streams map.
+	activeStreams[dst.ID] = stream
 }
 
 func signalHandler(ctx context.Context, host host.Host, lockPath string, dht *dht.IpfsDHT) {
@@ -324,7 +330,15 @@ func streamHandler(stream network.Stream) {
 			}
 		}
 		stream.SetWriteDeadline(time.Now().Add(25 * time.Second))
-		tunDev.Iface.Write(packet[:size])
+		dstIP := net.IPv4(packet[16], packet[17], packet[18], packet[19])
+		route, found := config.FindRouteForIP(cfg.Routes, dstIP)
+		if !found {
+			// not found means the packet is for us
+			tunDev.Iface.Write(packet[:size])
+		} else {
+			// FIXME: should decrease the TTL here
+			sendPacket(route.Target, packet, int(plen))
+		}
 	}
 }
 

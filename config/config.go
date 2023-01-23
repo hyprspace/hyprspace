@@ -98,3 +98,12 @@ func FindRoute(routes []Route, needle net.IPNet) (*Route, bool) {
 	}
 	return nil, false
 }
+
+func FindRouteForIP(routes []Route, needle net.IP) (*Route, bool) {
+	for _, r := range routes {
+		if r.Network.Contains(needle) {
+			return &r, true
+		}
+	}
+	return nil, false
+}

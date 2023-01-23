@@ -20,6 +20,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/pnet"
 	"github.com/libp2p/go-libp2p/p2p/discovery/backoff"
 	"github.com/libp2p/go-libp2p/p2p/host/autorelay"
+	"github.com/libp2p/go-libp2p/p2p/protocol/circuitv2/relay"
 	libp2pquic "github.com/libp2p/go-libp2p/p2p/transport/quic"
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
 	ma "github.com/multiformats/go-multiaddr"
@@ -88,7 +89,7 @@ func getExtraBootstrapNodes(addr ma.Multiaddr) (nodesList []string) {
 }
 
 // CreateNode creates an internal Libp2p nodes and returns it and it's DHT Discovery service.
-func CreateNode(ctx context.Context, inputKey []byte, port int, handler network.StreamHandler) (node host.Host, dhtOut *dht.IpfsDHT, err error) {
+func CreateNode(ctx context.Context, inputKey []byte, port int, handler network.StreamHandler, acl relay.ACLFilter) (node host.Host, dhtOut *dht.IpfsDHT, err error) {
 	// Unmarshal Private Key
 	privateKey, err := crypto.UnmarshalPrivateKey(inputKey)
 	if err != nil {
@@ -128,10 +129,11 @@ func CreateNode(ctx context.Context, inputKey []byte, port int, handler network.
 		libp2p.Transport(libp2pquic.NewTransport),
 		libp2p.Transport(tcp.NewTCPTransport),
 		libp2p.EnableHolePunching(),
-		libp2p.EnableRelayService(),
+		libp2p.EnableRelayService(relay.WithLimit(nil), relay.WithACL(acl)),
 		libp2p.EnableNATService(),
 		libp2p.EnableAutoRelay(
 			autorelay.WithNumRelays(2),
+			autorelay.WithBootDelay(10*time.Second),
 			autorelay.WithPeerSource(func(ctx context.Context, numPeers int) <-chan peer.AddrInfo {
 				r := make(chan peer.AddrInfo)
 				go func() {
@@ -230,7 +232,9 @@ func CreateNode(ctx context.Context, inputKey []byte, port int, handler network.
 		for {
 			for _, p := range node.Network().Peers() {
 				pi := node.Network().Peerstore().PeerInfo(p)
-				peerChan <- pi
+				if acl.AllowReserve(p, node.Addrs()[0]) {
+					peerChan <- pi
+				}
 			}
 			time.Sleep(delay.Delay())
 		}

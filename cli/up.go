@@ -124,6 +124,9 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 	// PeX
 	go p2p.PeXService(ctx, host, cfg)
 
+	// Route metrics and latency
+	go p2p.RouteMetricsService(ctx, host, cfg)
+
 	// Register the application to listen for signals
 	go signalHandler(ctx, host, lockPath, dht)
 

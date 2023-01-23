@@ -75,6 +75,9 @@ func (hsr *HyprspaceRPC) Route(args *RouteArgs, reply *RouteReply) error {
 			Routes: routes,
 		}
 	case Relay:
+		if len(args.Args) != 2 {
+			return errors.New("expected exactly 2 arguments")
+		}
 		var networks []net.IPNet
 		if args.Args[0] == "all" {
 			for _, r := range hsr.config.Routes {
@@ -99,6 +102,9 @@ func (hsr *HyprspaceRPC) Route(args *RouteArgs, reply *RouteReply) error {
 			p2p.AddReroute(n, p)
 		}
 	case Reset:
+		if len(args.Args) != 1 {
+			return errors.New("expected exactly 1 argument")
+		}
 		var networks []net.IPNet
 		if args.Args[0] == "all" {
 			for _, r := range hsr.config.Routes {

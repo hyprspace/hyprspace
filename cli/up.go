@@ -178,12 +178,17 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 		if ip.Equal(dstIP) {
 			continue
 		}
-		var dst *config.Peer
+		var dst *peer.ID
 
 		// Check route table for destination address.
 		for _, route := range cfg.Routes {
 			if route.Network.Contains(dstIP) {
-				dst = &route.Target
+				reroute, found := p2p.FindReroute(route.Network, false)
+				if found {
+					dst = &reroute.To
+				} else {
+					dst = &route.Target.ID
+				}
 				break
 			}
 		}
@@ -195,9 +200,9 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 	}
 }
 
-func sendPacket(dst config.Peer, packet []byte, plen int) {
+func sendPacket(dst peer.ID, packet []byte, plen int) {
 	// Check if we already have an open connection to the destination peer.
-	stream, ok := activeStreams[dst.ID]
+	stream, ok := activeStreams[dst]
 	if ok {
 		// Write out the packet's length to the libp2p stream to ensure
 		// we know the full size of the packet at the other end.
@@ -214,12 +219,12 @@ func sendPacket(dst config.Peer, packet []byte, plen int) {
 		// If we encounter an error when writing to a stream we should
 		// close that stream and delete it from the active stream map.
 		stream.Close()
-		delete(activeStreams, dst.ID)
+		delete(activeStreams, dst)
 	}
 
-	stream, err := node.NewStream(ctx, dst.ID, p2p.Protocol)
+	stream, err := node.NewStream(ctx, dst, p2p.Protocol)
 	if err != nil {
-		fmt.Println("[!] Failed to open stream to " + dst.ID.String())
+		fmt.Println("[!] Failed to open stream to " + dst.String())
 		go p2p.Rediscover()
 		return
 	}
@@ -239,7 +244,7 @@ func sendPacket(dst config.Peer, packet []byte, plen int) {
 
 	// If all succeeds when writing the packet to the stream
 	// we should reuse this stream by adding it active streams map.
-	activeStreams[dst.ID] = stream
+	activeStreams[dst] = stream
 }
 
 func signalHandler(ctx context.Context, host host.Host, lockPath string, dht *dht.IpfsDHT) {
@@ -337,7 +342,7 @@ func streamHandler(stream network.Stream) {
 			tunDev.Iface.Write(packet[:size])
 		} else {
 			// FIXME: should decrease the TTL here
-			sendPacket(route.Target, packet, int(plen))
+			sendPacket(route.Target.ID, packet, int(plen))
 		}
 	}
 }

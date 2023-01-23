@@ -33,6 +33,7 @@ func init() {
 	cmd.Register(&Down)
 	cmd.Register(&Status)
 	cmd.Register(&Peers)
+	cmd.Register(&Route)
 	cmd.Register(&cmd.Version)
 }
 

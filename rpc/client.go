@@ -31,3 +31,12 @@ func Peers(ifname string) PeersReply {
 	}
 	return reply
 }
+
+func Route(ifname string, args RouteArgs) RouteReply {
+	client := connect(ifname)
+	var reply RouteReply
+	if err := client.Call("HyprspaceRPC.Route", args, &reply); err != nil {
+		log.Fatal("[!] RPC call failed: ", err)
+	}
+	return reply
+}

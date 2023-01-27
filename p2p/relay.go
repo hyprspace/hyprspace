@@ -19,7 +19,7 @@ func (ccr ClosedCircuitRelayFilter) AllowReserve(p peer.ID, a multiaddr.Multiadd
 func (ccr ClosedCircuitRelayFilter) AllowConnect(src peer.ID, srcAddr multiaddr.Multiaddr, dest peer.ID) bool {
 	_, foundSrc := config.FindPeer(ccr.allowedPeers, src)
 	_, foundDst := config.FindPeer(ccr.allowedPeers, dest)
-	return foundSrc && foundDst
+	return foundSrc || foundDst
 }
 
 func NewClosedCircuitRelayFilter(allowedPeers []config.Peer) relay.ACLFilter {

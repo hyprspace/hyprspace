@@ -57,8 +57,8 @@ func NewPeXStreamHandler(host host.Host, cfg *config.Config) func(network.Stream
 			// peer requests addresses
 			for _, p := range cfg.Peers {
 				if p.ID != stream.Conn().RemotePeer() {
-					for _, c := range host.Network().ConnsToPeer(p.ID) {
-						_, err := stream.Write([]byte(fmt.Sprintf("%s|%s\n", c.RemotePeer().String(), c.RemoteMultiaddr().String())))
+					for _, a := range host.Peerstore().Addrs(p.ID) {
+						_, err := stream.Write([]byte(fmt.Sprintf("%s|%s\n", p.ID, a)))
 						if checkErrPeX(err, stream) {
 							return
 						}

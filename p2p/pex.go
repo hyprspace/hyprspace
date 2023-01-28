@@ -128,6 +128,7 @@ func PeXService(ctx context.Context, host host.Host, cfg *config.Config) {
 							if err != nil {
 								for _, addrInfo := range addrInfos {
 									host.Peerstore().AddAddrs(addrInfo.ID, addrInfo.Addrs, 30*time.Second)
+									go host.Connect(ctx, addrInfo)
 								}
 							}
 						}()
@@ -141,6 +142,7 @@ func PeXService(ctx context.Context, host host.Host, cfg *config.Config) {
 							if err != nil {
 								for _, addrInfo := range addrInfos {
 									host.Peerstore().AddAddrs(addrInfo.ID, addrInfo.Addrs, 30*time.Second)
+									go host.Connect(ctx, addrInfo)
 								}
 							}
 						}()

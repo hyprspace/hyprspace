@@ -82,7 +82,7 @@ func RequestPeX(ctx context.Context, host host.Host, peers []peer.ID) (addrInfos
 		for {
 			str, err := buf.ReadString('\n')
 			if err == io.EOF {
-				return nil, err
+				return addrInfos, nil
 			} else if checkErrPeX(err, s) {
 				return nil, err
 			}

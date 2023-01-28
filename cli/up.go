@@ -107,6 +107,7 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 		port,
 		streamHandler,
 		p2p.NewClosedCircuitRelayFilter(cfg.Peers),
+		cfg.Peers,
 	)
 	checkErr(err)
 	host.SetStreamHandler(p2p.PeXProtocol, p2p.NewPeXStreamHandler(host, cfg))

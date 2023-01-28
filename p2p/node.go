@@ -11,6 +11,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/hyprspace/hyprspace/config"
 	"github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/crypto"
@@ -20,6 +21,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/pnet"
 	"github.com/libp2p/go-libp2p/p2p/discovery/backoff"
 	"github.com/libp2p/go-libp2p/p2p/host/autorelay"
+	routedhost "github.com/libp2p/go-libp2p/p2p/host/routed"
 	"github.com/libp2p/go-libp2p/p2p/protocol/circuitv2/relay"
 	libp2pquic "github.com/libp2p/go-libp2p/p2p/transport/quic"
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
@@ -89,7 +91,7 @@ func getExtraBootstrapNodes(addr ma.Multiaddr) (nodesList []string) {
 }
 
 // CreateNode creates an internal Libp2p nodes and returns it and it's DHT Discovery service.
-func CreateNode(ctx context.Context, inputKey []byte, port int, handler network.StreamHandler, acl relay.ACLFilter) (node host.Host, dhtOut *dht.IpfsDHT, err error) {
+func CreateNode(ctx context.Context, inputKey []byte, port int, handler network.StreamHandler, acl relay.ACLFilter, vpnPeers []config.Peer) (node host.Host, dhtOut *dht.IpfsDHT, err error) {
 	// Unmarshal Private Key
 	privateKey, err := crypto.UnmarshalPrivateKey(inputKey)
 	if err != nil {
@@ -119,7 +121,7 @@ func CreateNode(ctx context.Context, inputKey []byte, port int, handler network.
 	peerChan := make(chan peer.AddrInfo)
 
 	// Create libp2p node
-	node, err = libp2p.New(
+	basicHost, err := libp2p.New(
 		maybePrivateNet,
 		libp2p.ListenAddrStrings(ip6tcp, ip4tcp, ip4quic, ip6quic),
 		libp2p.Identity(privateKey),
@@ -164,9 +166,6 @@ func CreateNode(ctx context.Context, inputKey []byte, port int, handler network.
 		return
 	}
 
-	// Setup Hyprspace Stream Handler
-	node.SetStreamHandler(Protocol, handler)
-
 	// Define Bootstrap Nodes.
 	peers := []string{
 		"/ip4/168.235.67.108/tcp/4001/p2p/QmRMA5pWXtfuW1y5w2t9gYxrDDD6bPRLKdWAYnHTeCxZMm",
@@ -190,7 +189,7 @@ func CreateNode(ctx context.Context, inputKey []byte, port int, handler network.
 			if err == nil {
 				fmt.Printf("[+] %d additional addresses\n", len(extraPeers))
 				for _, p := range extraPeers {
-					node.Peerstore().AddAddrs(p.ID, p.Addrs, 5*time.Minute)
+					basicHost.Peerstore().AddAddrs(p.ID, p.Addrs, 5*time.Minute)
 				}
 			}
 		}
@@ -199,7 +198,7 @@ func CreateNode(ctx context.Context, inputKey []byte, port int, handler network.
 	// Create DHT Subsystem
 	dhtOut, err = dht.New(
 		ctx,
-		node,
+		basicHost,
 		dht.Mode(dht.ModeClient),
 		dht.BootstrapPeers(staticBootstrapPeers...),
 		dht.BootstrapPeersFunc(func() []peer.AddrInfo {
@@ -221,6 +220,13 @@ func CreateNode(ctx context.Context, inputKey []byte, port int, handler network.
 			}
 		}),
 	)
+
+	pexr := PeXRouting{basicHost, vpnPeers}
+	pr := ParallelRouting{[]routedhost.Routing{pexr, dhtOut}}
+	node = routedhost.Wrap(basicHost, pr)
+
+	// Setup Hyprspace Stream Handler
+	node.SetStreamHandler(Protocol, handler)
 
 	if err != nil {
 		return node, nil, err

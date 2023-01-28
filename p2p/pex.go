@@ -14,8 +14,14 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/multiformats/go-multiaddr"
 )
+
+type PeXRouting struct {
+	host     host.Host
+	vpnPeers []config.Peer
+}
 
 const PeXProtocol = "/hyprspace/pex/0.0.1"
 
@@ -64,11 +70,11 @@ func NewPeXStreamHandler(host host.Host, cfg *config.Config) func(network.Stream
 	}
 }
 
-func RequestPeX(ctx context.Context, host host.Host, peers []peer.ID) error {
+func RequestPeX(ctx context.Context, host host.Host, peers []peer.ID) (addrInfos []peer.AddrInfo, e error) {
 	for _, p := range peers {
 		s, err := host.NewStream(ctx, p, PeXProtocol)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		s.Write([]byte("r\n"))
 		s.SetDeadline(time.Now().Add(10 * time.Second))
@@ -76,9 +82,9 @@ func RequestPeX(ctx context.Context, host host.Host, peers []peer.ID) error {
 		for {
 			str, err := buf.ReadString('\n')
 			if err == io.EOF {
-				return nil
+				return nil, err
 			} else if checkErrPeX(err, s) {
-				return err
+				return nil, err
 			}
 			str = strings.TrimSuffix(str, "\n")
 			splits := strings.Split(str, "|")
@@ -86,18 +92,20 @@ func RequestPeX(ctx context.Context, host host.Host, peers []peer.ID) error {
 			addrStr := splits[1]
 			peerId, err := peer.Decode(idStr)
 			if checkErrPeX(err, s) {
-				return err
+				return nil, err
 			}
 			ma, err := multiaddr.NewMultiaddr(addrStr)
 			if checkErrPeX(err, s) {
-				return err
+				return nil, err
 			}
 			fmt.Printf("[-] Got PeX peer: %s/p2p/%s\n", addrStr, idStr)
-			host.Peerstore().AddAddr(peerId, ma, 24*time.Hour)
-			host.Network().DialPeer(ctx, peerId)
+			addrInfos = append(addrInfos, peer.AddrInfo{
+				ID:    peerId,
+				Addrs: []multiaddr.Multiaddr{ma},
+			})
 		}
 	}
-	return nil
+	return addrInfos, nil
 }
 
 func PeXService(ctx context.Context, host host.Host, cfg *config.Config) {
@@ -115,17 +123,59 @@ func PeXService(ctx context.Context, host host.Host, cfg *config.Config) {
 			for _, vpnPeer := range cfg.Peers {
 				if vpnPeer.ID == evt.Peer {
 					if evt.Connectedness == network.Connected {
-						go RequestPeX(ctx, host, []peer.ID{evt.Peer})
+						go func() {
+							addrInfos, err := RequestPeX(ctx, host, []peer.ID{evt.Peer})
+							if err != nil {
+								for _, addrInfo := range addrInfos {
+									host.Peerstore().AddAddrs(addrInfo.ID, addrInfo.Addrs, 30*time.Second)
+								}
+							}
+						}()
 					} else if evt.Connectedness == network.NotConnected {
 						peers := []peer.ID{}
 						for _, p := range cfg.Peers {
 							peers = append(peers, p.ID)
 						}
-						go RequestPeX(ctx, host, peers)
+						go func() {
+							addrInfos, err := RequestPeX(ctx, host, peers)
+							if err != nil {
+								for _, addrInfo := range addrInfos {
+									host.Peerstore().AddAddrs(addrInfo.ID, addrInfo.Addrs, 30*time.Second)
+								}
+							}
+						}()
 					}
 					break
 				}
 			}
 		}
 	}
+}
+
+func (pexr PeXRouting) FindPeer(ctx context.Context, targetPeer peer.ID) (peer.AddrInfo, error) {
+	found := false
+	peers := []peer.ID{}
+	addrInfo := peer.AddrInfo{
+		ID: targetPeer,
+	}
+	for _, p := range pexr.vpnPeers {
+		peers = append(peers, p.ID)
+		if p.ID == targetPeer {
+			found = true
+		}
+	}
+	// PeX routing only returns VPN node addresses
+	if !found {
+		return addrInfo, routing.ErrNotFound
+	}
+	addrInfos, err := RequestPeX(ctx, pexr.host, peers)
+	if err != nil {
+		return addrInfo, err
+	}
+	for _, ai := range addrInfos {
+		if ai.ID == targetPeer {
+			addrInfo.Addrs = append(addrInfo.Addrs, ai.Addrs...)
+		}
+	}
+	return addrInfo, nil
 }

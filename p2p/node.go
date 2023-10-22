@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -50,7 +50,7 @@ func getExtraPeers(addr ma.Multiaddr) (nodesList []string) {
 	}
 	defer resp.Body.Close()
 
-	apiResponse, err := ioutil.ReadAll(resp.Body)
+	apiResponse, err := io.ReadAll(resp.Body)
 
 	if err != nil {
 		return
@@ -80,7 +80,7 @@ func getExtraBootstrapNodes(addr ma.Multiaddr) (nodesList []string) {
 	}
 	defer resp.Body.Close()
 
-	apiResponse, err := ioutil.ReadAll(resp.Body)
+	apiResponse, err := io.ReadAll(resp.Body)
 
 	if err != nil {
 		return

@@ -58,69 +58,40 @@ func (hsr *HyprspaceRPC) Route(args *RouteArgs, reply *RouteReply) error {
 		var routes []RouteInfo
 		for _, r := range hsr.config.Routes {
 			connected := hsr.host.Network().Connectedness(r.Target.ID) == network.Connected
-			reroute, found := p2p.FindReroute(r.Network, false)
+			relay := false
 			relayAddr := r.Target.ID
-			if found {
-				relayAddr = reroute.To
+			if connected {
+			ConnLoop:
+				for _, c := range hsr.host.Network().ConnsToPeer(r.Target.ID) {
+					for _, s := range c.GetStreams() {
+						if s.Protocol() == p2p.Protocol {
+							if _, err := c.RemoteMultiaddr().ValueForProtocol(multiaddr.P_CIRCUIT); err == nil {
+								relay = true
+								if ra, err := c.RemoteMultiaddr().ValueForProtocol(multiaddr.P_P2P); err == nil {
+									relayAddr, err = peer.Decode(ra)
+									if err != nil {
+										relayAddr = r.Target.ID
+									}
+								}
+							} else {
+								relay = false
+								relayAddr = r.Target.ID
+								break ConnLoop
+							}
+						}
+					}
+				}
 			}
 			routes = append(routes, RouteInfo{
 				Network:     r.Network,
 				TargetAddr:  r.Target.ID,
 				RelayAddr:   relayAddr,
-				IsRelay:     found,
+				IsRelay:     relay,
 				IsConnected: connected,
 			})
 		}
 		*reply = RouteReply{
 			Routes: routes,
-		}
-	case Relay:
-		if len(args.Args) != 2 {
-			return errors.New("expected exactly 2 arguments")
-		}
-		var networks []net.IPNet
-		if args.Args[0] == "all" {
-			for _, r := range hsr.config.Routes {
-				networks = append(networks, r.Network)
-			}
-		} else {
-			_, network, err := net.ParseCIDR(args.Args[0])
-			if err != nil {
-				return err
-			} else if _, found := config.FindRoute(hsr.config.Routes, *network); !found {
-				return errors.New("no such network")
-			}
-			networks = []net.IPNet{*network}
-		}
-		p, err := peer.Decode(args.Args[1])
-		if err != nil {
-			return err
-		} else if _, found := config.FindPeer(hsr.config.Peers, p); !found {
-			return errors.New("no such peer")
-		}
-		for _, n := range networks {
-			p2p.AddReroute(n, p)
-		}
-	case Reset:
-		if len(args.Args) != 1 {
-			return errors.New("expected exactly 1 argument")
-		}
-		var networks []net.IPNet
-		if args.Args[0] == "all" {
-			for _, r := range hsr.config.Routes {
-				networks = append(networks, r.Network)
-			}
-		} else {
-			_, network, err := net.ParseCIDR(args.Args[0])
-			if err != nil {
-				return err
-			} else if _, found := config.FindRoute(hsr.config.Routes, *network); !found {
-				return errors.New("no such network")
-			}
-			networks = []net.IPNet{*network}
-		}
-		for _, n := range networks {
-			p2p.FindReroute(n, true)
 		}
 	default:
 		return errors.New("no such action")

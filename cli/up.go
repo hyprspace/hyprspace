@@ -198,12 +198,7 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 		// Check route table for destination address.
 		for _, route := range cfg.Routes {
 			if route.Network.Contains(dstIP) {
-				reroute, found := p2p.FindReroute(route.Network, false)
-				if found {
-					dst = &reroute.To
-				} else {
-					dst = &route.Target.ID
-				}
+				dst = &route.Target.ID
 				break
 			}
 		}

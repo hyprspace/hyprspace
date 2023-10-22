@@ -16,28 +16,31 @@ var Route = cmd.Sub{
 }
 
 type RouteArgs struct {
-	Action        string
-	InterfaceName string
-	Args          []string `zero:"true"`
+	Action string
+	Args   []string `zero:"true"`
 }
 
 func RouteRun(r *cmd.Root, c *cmd.Sub) {
 	// Parse Command Args
 	args := c.Args.(*RouteArgs)
+	ifName := r.Flags.(*GlobalFlags).InterfaceName
+	if ifName == "" {
+		ifName = "hyprspace"
+	}
 
 	action := rpc.RouteAction(args.Action)
 	rArgs := rpc.RouteArgs{
 		Action: action,
 		Args:   args.Args,
 	}
-	reply := rpc.Route(args.InterfaceName, rArgs)
+	reply := rpc.Route(ifName, rArgs)
 	for _, r := range reply.Routes {
 		var target string
 		connectStatus := ""
 		if r.IsRelay {
-			target = fmt.Sprintf("%s relay target %s", r.RelayAddr, r.TargetAddr)
+			target = fmt.Sprintf("/p2p/%s/p2p-circuit/p2p/%s", r.RelayAddr, r.TargetAddr)
 		} else {
-			target = fmt.Sprintf("%s direct", r.TargetAddr)
+			target = fmt.Sprintf("/p2p/%s", r.TargetAddr)
 		}
 		if r.IsConnected {
 			connectStatus = " connected"

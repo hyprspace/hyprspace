@@ -25,9 +25,7 @@ type PeersReply struct {
 type RouteAction string
 
 const (
-	Show  RouteAction = "show"
-	Relay             = "relay"
-	Reset             = "reset"
+	Show RouteAction = "show"
 )
 
 type RouteInfo struct {

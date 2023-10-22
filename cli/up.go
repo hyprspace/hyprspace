@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/fs"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -26,6 +27,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/multiformats/go-multibase"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 var (
@@ -139,6 +141,17 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 
 	// RPC server
 	go hsrpc.RpcServer(ctx, multiaddr.StringCast(fmt.Sprintf("/unix/run/hyprspace-rpc.%s.sock", cfg.Interface.Name)), host, *cfg)
+
+	// metrics endpoint
+	metricsPort, ok := os.LookupEnv("HYPRSPACE_METRICS_PORT")
+	if ok {
+		metricsTuple := fmt.Sprintf("127.0.0.1:%s", metricsPort)
+		http.Handle("/metrics", promhttp.Handler())
+		go func() {
+			http.ListenAndServe(metricsTuple, nil)
+		}()
+		fmt.Printf("[+] Listening for metrics scrape requests on http://%s/metrics\n", metricsTuple)
+	}
 
 	// Write lock to filesystem to indicate an existing running daemon.
 	err = os.WriteFile(lockPath, []byte(fmt.Sprint(os.Getpid())), os.ModePerm)

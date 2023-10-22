@@ -239,7 +239,7 @@ func sendPacket(dst peer.ID, packet []byte, plen int) {
 
 	stream, err := node.NewStream(ctx, dst, p2p.Protocol)
 	if err != nil {
-		fmt.Println("[!] Failed to open stream to " + dst.String())
+		fmt.Println("[!] Failed to open stream to " + dst.String() + ": " + err.Error())
 		go p2p.Rediscover()
 		return
 	}

@@ -133,10 +133,8 @@ func CreateNode(ctx context.Context, inputKey []byte, port int, handler network.
 		libp2p.EnableHolePunching(),
 		libp2p.EnableRelayService(relay.WithLimit(nil), relay.WithACL(acl)),
 		libp2p.EnableNATService(),
-		libp2p.EnableAutoRelay(
-			autorelay.WithNumRelays(2),
-			autorelay.WithBootDelay(10*time.Second),
-			autorelay.WithPeerSource(func(ctx context.Context, numPeers int) <-chan peer.AddrInfo {
+		libp2p.EnableAutoRelayWithPeerSource(
+			func(ctx context.Context, numPeers int) <-chan peer.AddrInfo {
 				r := make(chan peer.AddrInfo)
 				go func() {
 					defer close(r)
@@ -157,7 +155,9 @@ func CreateNode(ctx context.Context, inputKey []byte, port int, handler network.
 					}
 				}()
 				return r
-			}),
+			},
+			autorelay.WithNumRelays(2),
+			autorelay.WithBootDelay(10*time.Second),
 		),
 		libp2p.WithDialTimeout(time.Second*5),
 		libp2p.FallbackDefaults,

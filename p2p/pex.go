@@ -129,7 +129,7 @@ func PeXService(ctx context.Context, host host.Host, cfg *config.Config) {
 					if evt.Connectedness == network.Connected {
 						go func() {
 							addrInfos, err := RequestPeX(ctx, host, []peer.ID{evt.Peer})
-							if err != nil {
+							if err == nil {
 								for _, addrInfo := range addrInfos {
 									host.Peerstore().AddAddrs(addrInfo.ID, addrInfo.Addrs, 30*time.Second)
 									go host.Connect(ctx, addrInfo)
@@ -143,7 +143,7 @@ func PeXService(ctx context.Context, host host.Host, cfg *config.Config) {
 						}
 						go func() {
 							addrInfos, err := RequestPeX(ctx, host, peers)
-							if err != nil {
+							if err == nil {
 								for _, addrInfo := range addrInfos {
 									host.Peerstore().AddAddrs(addrInfo.ID, addrInfo.Addrs, 30*time.Second)
 									go host.Connect(ctx, addrInfo)

@@ -16,6 +16,7 @@ import (
 	"github.com/ipfs/boxo/routing/http/contentrouter"
 	"github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
+	"github.com/libp2p/go-libp2p/core/connmgr"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
@@ -110,7 +111,7 @@ func getExtraBootstrapNodes(addr ma.Multiaddr) (nodesList []string) {
 }
 
 // CreateNode creates an internal Libp2p nodes and returns it and it's DHT Discovery service.
-func CreateNode(ctx context.Context, privateKey crypto.PrivKey, listenAddreses []ma.Multiaddr, handler network.StreamHandler, acl relay.ACLFilter, vpnPeers []config.Peer) (node host.Host, dhtOut *dht.IpfsDHT, err error) {
+func CreateNode(ctx context.Context, privateKey crypto.PrivKey, listenAddreses []ma.Multiaddr, handler network.StreamHandler, acl relay.ACLFilter, gater connmgr.ConnectionGater, vpnPeers []config.Peer) (node host.Host, dhtOut *dht.IpfsDHT, err error) {
 	maybePrivateNet := libp2p.ChainOptions()
 	swarmKeyFile, ok := os.LookupEnv("HYPRSPACE_SWARM_KEY")
 	if ok {
@@ -134,6 +135,7 @@ func CreateNode(ctx context.Context, privateKey crypto.PrivKey, listenAddreses [
 		libp2p.Identity(privateKey),
 		libp2p.UserAgent("hyprspace"),
 		libp2p.DefaultSecurity,
+		libp2p.ConnectionGater(gater),
 		libp2p.NATPortMap(),
 		libp2p.DefaultMuxers,
 		libp2p.Transport(libp2pquic.NewTransport),

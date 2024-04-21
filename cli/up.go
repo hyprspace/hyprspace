@@ -196,7 +196,7 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 
 		if found {
 			dst = route.Target.ID
-			sendPacket(dst, packet, plen)
+			go sendPacket(dst, packet, plen)
 		}
 	}
 }

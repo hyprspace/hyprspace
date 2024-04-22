@@ -32,10 +32,11 @@ func (hsr *HyprspaceRPC) Status(args *Args, reply *StatusReply) error {
 		if hsr.host.Network().Connectedness(p.ID) == network.Connected {
 			netPeersCurrent = netPeersCurrent + 1
 			for _, c := range hsr.host.Network().ConnsToPeer(p.ID) {
-				netPeerAddrsCurrent = append(netPeerAddrsCurrent, fmt.Sprintf("%s/p2p/%s (%s)",
+				netPeerAddrsCurrent = append(netPeerAddrsCurrent, fmt.Sprintf("@%s (%s) %s/p2p/%s",
+					p.Name,
+					hsr.host.Peerstore().LatencyEWMA(p.ID).String(),
 					c.RemoteMultiaddr().String(),
 					p.ID.String(),
-					hsr.host.Peerstore().LatencyEWMA(p.ID).String(),
 				))
 			}
 		}

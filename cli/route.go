@@ -42,6 +42,9 @@ func RouteRun(r *cmd.Root, c *cmd.Sub) {
 		} else {
 			target = fmt.Sprintf("/p2p/%s", r.TargetAddr)
 		}
+		if r.TargetName != "" {
+			target = fmt.Sprintf("@%s %s", r.TargetName, target)
+		}
 		if r.IsConnected {
 			connectStatus = " connected"
 		}

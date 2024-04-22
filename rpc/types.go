@@ -32,6 +32,7 @@ const (
 
 type RouteInfo struct {
 	Network     net.IPNet
+	TargetName  string
 	TargetAddr  peer.ID
 	RelayAddr   peer.ID
 	IsRelay     bool

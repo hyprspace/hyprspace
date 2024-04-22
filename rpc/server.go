@@ -93,6 +93,7 @@ func (hsr *HyprspaceRPC) Route(args *RouteArgs, reply *RouteReply) error {
 			}
 			routeInfos = append(routeInfos, RouteInfo{
 				Network:     rte.Network(),
+				TargetName:  rte.Target.Name,
 				TargetAddr:  rte.Target.ID,
 				RelayAddr:   relayAddr,
 				IsRelay:     relay,

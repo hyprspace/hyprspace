@@ -162,6 +162,33 @@ func FindPeer(peers []Peer, needle peer.ID) (*Peer, bool) {
 	return nil, false
 }
 
+func FindPeerByName(peers []Peer, needle string) (*Peer, bool) {
+	for _, p := range peers {
+		if p.Name == needle {
+			return &p, true
+		}
+	}
+	return nil, false
+}
+
+func FindPeerByIDPrefix(peers []Peer, needle string) (*Peer, bool) {
+	for _, p := range peers {
+		if strings.HasPrefix(p.ID.String(), needle) {
+			return &p, true
+		}
+	}
+	return nil, false
+}
+
+func FindPeerByCLIRef(peers []Peer, needle string) (*Peer, bool) {
+	if strings.HasPrefix(needle, "@") {
+		name := strings.TrimPrefix(needle, "@")
+		return FindPeerByName(peers, name)
+	} else {
+		return FindPeerByIDPrefix(peers, needle)
+	}
+}
+
 func (cfg Config) FindRoute(needle net.IPNet) (*RouteTableEntry, bool) {
 	networks, err := cfg.PeerLookup.ByRoute.CoveredNetworks(needle)
 	if err != nil {

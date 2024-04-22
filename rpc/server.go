@@ -111,19 +111,7 @@ func (hsr *HyprspaceRPC) Route(args *RouteArgs, reply *RouteReply) error {
 		if err != nil {
 			return err
 		}
-		peerId, err := peer.Decode(args.Args[1])
-		if err != nil {
-			return err
-		}
-		var target config.Peer
-		var found bool
-		for _, p := range hsr.config.Peers {
-			if p.ID == peerId {
-				target = p
-				found = true
-				break
-			}
-		}
+		target, found := config.FindPeerByCLIRef(hsr.config.Peers, args.Args[1])
 		if !found {
 			return errors.New("no such peer")
 		}
@@ -134,7 +122,7 @@ func (hsr *HyprspaceRPC) Route(args *RouteArgs, reply *RouteReply) error {
 
 		hsr.config.PeerLookup.ByRoute.Insert(&config.RouteTableEntry{
 			Net:    *network,
-			Target: target,
+			Target: *target,
 		})
 	case Del:
 		if len(args.Args) != 1 {

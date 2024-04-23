@@ -177,8 +177,8 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 
 	// Initialize active streams map and packet byte array.
 	activeStreams = make(map[peer.ID]MuxStream)
-	var packet = make([]byte, 1420)
 	for {
+		var packet = make([]byte, 1420)
 		// Read in a packet from the tun device.
 		plen, err := tunDev.Iface.Read(packet)
 		if errors.Is(err, fs.ErrClosed) {

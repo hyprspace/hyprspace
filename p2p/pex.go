@@ -82,8 +82,10 @@ func RequestPeX(ctx context.Context, host host.Host, peers []peer.ID) (addrInfos
 		for {
 			str, err := buf.ReadString('\n')
 			if err == io.EOF {
+				s.Close()
 				return addrInfos, nil
 			} else if checkErrPeX(err, s) {
+				s.Close()
 				return nil, err
 			}
 			str = strings.TrimSuffix(str, "\n")
@@ -92,10 +94,12 @@ func RequestPeX(ctx context.Context, host host.Host, peers []peer.ID) (addrInfos
 			addrStr := splits[1]
 			peerId, err := peer.Decode(idStr)
 			if checkErrPeX(err, s) {
+				s.Close()
 				return nil, err
 			}
 			ma, err := multiaddr.NewMultiaddr(addrStr)
 			if checkErrPeX(err, s) {
+				s.Close()
 				return nil, err
 			}
 			fmt.Printf("[-] Got PeX peer: %s/p2p/%s\n", addrStr, idStr)

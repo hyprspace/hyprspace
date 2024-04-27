@@ -9,6 +9,7 @@ import (
 	"github.com/DataDrake/cli-ng/v2/cmd"
 	"github.com/hyprspace/hyprspace/config"
 	"github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multibase"
 )
 
@@ -66,4 +67,15 @@ func InitRun(r *cmd.Root, c *cmd.Sub) {
 	checkErr(err)
 
 	fmt.Printf("Initialized new config at %s\n", configPath)
+	peerId, err := peer.IDFromPrivateKey(privKey)
+	if err == nil {
+		fmt.Println("Add this entry to your other peers:")
+		fmt.Println("{")
+		hostname, err := os.Hostname()
+		if err == nil {
+			fmt.Printf("  \"name\": \"%s\",\n", hostname)
+		}
+		fmt.Printf("  \"id\": \"%s\"\n", peerId)
+		fmt.Println("}")
+	}
 }

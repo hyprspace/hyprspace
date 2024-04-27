@@ -10,6 +10,7 @@ import (
 
 	"github.com/hyprspace/hyprspace/config"
 	"github.com/iguanesolutions/go-systemd/v5/resolved"
+	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/miekg/dns"
 	"github.com/multiformats/go-multibase"
@@ -66,7 +67,7 @@ func writeResponse(msg *dns.Msg, q dns.Question, p peer.ID, addr net.IP) {
 	})
 }
 
-func MagicDnsServer(ctx context.Context, config config.Config) {
+func MagicDnsServer(ctx context.Context, config config.Config, node host.Host) {
 	dns.HandleFunc(domainSuffix, func(w dns.ResponseWriter, r *dns.Msg) {
 		m := new(dns.Msg)
 		m.SetReply(r)
@@ -75,8 +76,8 @@ func MagicDnsServer(ctx context.Context, config config.Config) {
 			switch q.Qtype {
 			case dns.TypeA:
 				if qpeer, err := peer.Decode(strings.TrimSuffix(q.Name, "."+domainSuffix)); err == nil {
-					if qpeer == config.Interface.ID {
-						m.Answer = append(m.Answer, mkIDRecord(config.Interface.ID, config.Interface.BuiltinAddr))
+					if qpeer == node.ID() {
+						m.Answer = append(m.Answer, mkIDRecord(node.ID(), config.BuiltinAddr))
 					} else {
 						for _, p := range config.Peers {
 							if p.ID == qpeer {
@@ -94,8 +95,8 @@ func MagicDnsServer(ctx context.Context, config config.Config) {
 					qName := strings.ToLower(strings.TrimSuffix(q.Name, "."+domainSuffix))
 
 					if qName == strings.ToLower(hostname) {
-						m.Answer = append(m.Answer, mkAliasRecord(qName, config.Interface.ID))
-						m.Answer = append(m.Answer, mkIDRecord(config.Interface.ID, config.Interface.BuiltinAddr))
+						m.Answer = append(m.Answer, mkAliasRecord(qName, node.ID()))
+						m.Answer = append(m.Answer, mkIDRecord(node.ID(), config.BuiltinAddr))
 					} else if p, found := config.PeerLookup.ByName[qName]; found {
 						m.Answer = append(m.Answer, mkAliasRecord(qName, p.ID))
 						m.Answer = append(m.Answer, mkIDRecord(p.ID, p.BuiltinAddr))
@@ -128,7 +129,7 @@ func MagicDnsServer(ctx context.Context, config config.Config) {
 	}
 	defer conn.Close()
 
-	link, err := netlink.LinkByName(config.Interface.Name)
+	link, err := netlink.LinkByName(config.Interface)
 	if err != nil {
 		fmt.Println("[!] [dns] Failed to get link ID:", err)
 		return
@@ -137,14 +138,14 @@ func MagicDnsServer(ctx context.Context, config config.Config) {
 
 	for _, f := range [](func() error){
 		func() error {
-			return conn.SetLinkDNSEx(ctx, linkID, []resolved.LinkDNSEx{resolved.LinkDNSEx{
+			return conn.SetLinkDNSEx(ctx, linkID, []resolved.LinkDNSEx{{
 				Family:  syscall.AF_INET,
 				Address: []byte{127, 80, 1, 53},
 				Port:    5380,
 			}})
 		},
 		func() error {
-			return conn.SetLinkDomains(ctx, linkID, []resolved.LinkDomain{resolved.LinkDomain{
+			return conn.SetLinkDomains(ctx, linkID, []resolved.LinkDomain{{
 				Domain:        domainSuffix,
 				RoutingDomain: false,
 			}})

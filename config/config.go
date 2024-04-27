@@ -8,25 +8,24 @@ import (
 	"os"
 	"strings"
 
+	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/multiformats/go-multiaddr"
+	"github.com/multiformats/go-multibase"
 	"github.com/yl2chen/cidranger"
 )
 
 // Config is the main Configuration Struct for Hyprspace.
 type Config struct {
-	Path       string     `json:"-"`
-	Interface  Interface  `json:"interface"`
-	Peers      []Peer     `json:"peers"`
-	PeerLookup PeerLookup `json:"-"`
-}
-
-// Interface defines all of the fields that a local node needs to know about itself!
-type Interface struct {
-	Name        string  `json:"name"`
-	ID          peer.ID `json:"id"`
-	ListenPort  int     `json:"listen_port"`
-	BuiltinAddr net.IP  `json:"-"`
-	PrivateKey  string  `json:"private_key"`
+	Path                   string                `json:"-"`
+	Interface              string                `json:"-"`
+	EncodedListenAddresses []string              `json:"listenAddresses"`
+	ListenAddresses        []multiaddr.Multiaddr `json:"-"`
+	Peers                  []Peer                `json:"peers"`
+	PeerLookup             PeerLookup            `json:"-"`
+	EncodedPrivateKey      string                `json:"privateKey"`
+	PrivateKey             crypto.PrivKey        `json:"-"`
+	BuiltinAddr            net.IP                `json:"-"`
 }
 
 // Peer defines a peer in the configuration. We might add more to this later.
@@ -64,11 +63,11 @@ func Read(path string) (*Config, error) {
 		return nil, err
 	}
 	result := Config{
-		Interface: Interface{
-			Name:       "hs0",
-			ListenPort: 8001,
-			ID:         "",
-			PrivateKey: "",
+		EncodedListenAddresses: []string{
+			"/ip4/0.0.0.0/tcp/8001",
+			"/ip4/0.0.0.0/udp/8001/quic-v1",
+			"/ip6/::/tcp/8001",
+			"/ip6/::/udp/8001/quic-v1",
 		},
 	}
 
@@ -78,7 +77,35 @@ func Read(path string) (*Config, error) {
 		return nil, err
 	}
 
-	result.Interface.BuiltinAddr = mkBuiltinAddr(result.Interface.ID)
+	_, keyBytes, err := multibase.Decode(result.EncodedPrivateKey)
+	if err != nil {
+		return nil, err
+	}
+
+	pk, err := crypto.UnmarshalPrivateKey(keyBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	result.PrivateKey = pk
+	if err != nil {
+		return nil, err
+	}
+
+	peerID, err := peer.IDFromPrivateKey(result.PrivateKey)
+	if err != nil {
+		return nil, err
+	}
+
+	result.BuiltinAddr = mkBuiltinAddr(peerID)
+
+	for _, addrString := range result.EncodedListenAddresses {
+		addr, err := multiaddr.NewMultiaddr(addrString)
+		if err != nil {
+			return nil, err
+		}
+		result.ListenAddresses = append(result.ListenAddresses, addr)
+	}
 
 	result.PeerLookup.ByRoute = cidranger.NewPCTrieRanger()
 	result.PeerLookup.ByName = make(map[string]Peer)

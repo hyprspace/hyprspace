@@ -91,13 +91,7 @@ func getExtraBootstrapNodes(addr ma.Multiaddr) (nodesList []string) {
 }
 
 // CreateNode creates an internal Libp2p nodes and returns it and it's DHT Discovery service.
-func CreateNode(ctx context.Context, inputKey []byte, port int, handler network.StreamHandler, acl relay.ACLFilter, vpnPeers []config.Peer) (node host.Host, dhtOut *dht.IpfsDHT, err error) {
-	// Unmarshal Private Key
-	privateKey, err := crypto.UnmarshalPrivateKey(inputKey)
-	if err != nil {
-		return
-	}
-
+func CreateNode(ctx context.Context, privateKey crypto.PrivKey, listenAddreses []ma.Multiaddr, handler network.StreamHandler, acl relay.ACLFilter, vpnPeers []config.Peer) (node host.Host, dhtOut *dht.IpfsDHT, err error) {
 	maybePrivateNet := libp2p.ChainOptions()
 	swarmKeyFile, ok := os.LookupEnv("HYPRSPACE_SWARM_KEY")
 	if ok {
@@ -112,18 +106,12 @@ func CreateNode(ctx context.Context, inputKey []byte, port int, handler network.
 		maybePrivateNet = libp2p.PrivateNetwork(key)
 	}
 
-	ip6quic := fmt.Sprintf("/ip6/::/udp/%d/quic-v1", port)
-	ip4quic := fmt.Sprintf("/ip4/0.0.0.0/udp/%d/quic-v1", port)
-
-	ip6tcp := fmt.Sprintf("/ip6/::/tcp/%d", port)
-	ip4tcp := fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", port)
-
 	peerChan := make(chan peer.AddrInfo)
 
 	// Create libp2p node
 	basicHost, err := libp2p.New(
 		maybePrivateNet,
-		libp2p.ListenAddrStrings(ip6tcp, ip4tcp, ip4quic, ip6quic),
+		libp2p.ListenAddrs(listenAddreses...),
 		libp2p.Identity(privateKey),
 		libp2p.DefaultSecurity,
 		libp2p.NATPortMap(),

@@ -11,7 +11,6 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"strconv"
 	"syscall"
 	"time"
 
@@ -27,7 +26,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
-	"github.com/multiformats/go-multibase"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/yl2chen/cidranger"
 )
@@ -51,34 +49,25 @@ var Up = cmd.Sub{
 	Name:  "up",
 	Alias: "up",
 	Short: "Create and Bring Up a Hyprspace Interface.",
-	Args:  &UpArgs{},
-	Flags: &UpFlags{},
 	Run:   UpRun,
-}
-
-// UpArgs handles the specific arguments for the up command.
-type UpArgs struct {
-	InterfaceName string
-}
-
-// UpFlags handles the specific flags for the up command.
-type UpFlags struct {
-	Foreground bool `short:"f" long:"foreground" desc:"Don't Create Background Daemon."`
 }
 
 // UpRun handles the execution of the up command.
 func UpRun(r *cmd.Root, c *cmd.Sub) {
-	// Parse Command Args
-	args := c.Args.(*UpArgs)
+	ifName := r.Flags.(*GlobalFlags).InterfaceName
+	if ifName == "" {
+		ifName = "hyprspace"
+	}
 
 	// Parse Global Config Flag for Custom Config Path
 	configPath := r.Flags.(*GlobalFlags).Config
 	if configPath == "" {
-		configPath = "/etc/hyprspace/" + args.InterfaceName + ".json"
+		configPath = "/etc/hyprspace/" + ifName + ".json"
 	}
 
 	// Read in configuration from file.
 	cfg2, err := config.Read(configPath)
+	cfg2.Interface = ifName
 	cfg = cfg2
 	checkErr(err)
 
@@ -86,8 +75,8 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 
 	// Create new TUN device
 	tunDev, err = tun.New(
-		cfg.Interface.Name,
-		tun.Address(cfg.Interface.BuiltinAddr.String()+"/32"),
+		cfg.Interface,
+		tun.Address(cfg.BuiltinAddr.String()+"/32"),
 		tun.MTU(1420),
 	)
 	if err != nil {
@@ -108,16 +97,11 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 
 	fmt.Println("[+] Creating LibP2P Node")
 
-	// Check that the listener port is available.
-	port, err := verifyPort(cfg.Interface.ListenPort)
-	checkErr(err)
-
-	_, privateKey, err := multibase.Decode(cfg.Interface.PrivateKey)
 	// Create P2P Node
 	host, dht, err := p2p.CreateNode(
 		ctx,
-		privateKey,
-		port,
+		cfg.PrivateKey,
+		cfg.ListenAddresses,
 		streamHandler,
 		p2p.NewClosedCircuitRelayFilter(cfg.Peers),
 		cfg.Peers,
@@ -136,7 +120,7 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 	go p2p.Discover(ctx, host, dht, cfg.Peers)
 
 	// Configure path for lock
-	lockPath := filepath.Join(filepath.Dir(cfg.Path), cfg.Interface.Name+".lock")
+	lockPath := filepath.Join(filepath.Dir(cfg.Path), cfg.Interface+".lock")
 
 	// PeX
 	go p2p.PeXService(ctx, host, cfg)
@@ -151,10 +135,10 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 	go eventLogger(ctx, host)
 
 	// RPC server
-	go hsrpc.RpcServer(ctx, multiaddr.StringCast(fmt.Sprintf("/unix/run/hyprspace-rpc.%s.sock", cfg.Interface.Name)), host, *cfg, *tunDev)
+	go hsrpc.RpcServer(ctx, multiaddr.StringCast(fmt.Sprintf("/unix/run/hyprspace-rpc.%s.sock", cfg.Interface)), host, *cfg, *tunDev)
 
 	// Magic DNS server
-	go hsdns.MagicDnsServer(ctx, *cfg)
+	go hsdns.MagicDnsServer(ctx, *cfg, node)
 
 	// metrics endpoint
 	metricsPort, ok := os.LookupEnv("HYPRSPACE_METRICS_PORT")
@@ -201,7 +185,7 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 		}
 
 		dstIP := net.IPv4(packet[16], packet[17], packet[18], packet[19])
-		if cfg.Interface.BuiltinAddr.Equal(dstIP) {
+		if cfg.BuiltinAddr.Equal(dstIP) {
 			continue
 		}
 		var dst peer.ID
@@ -353,35 +337,4 @@ func streamHandler(stream network.Stream) {
 		stream.SetWriteDeadline(time.Now().Add(25 * time.Second))
 		tunDev.Iface.Write(packet[:size])
 	}
-}
-
-func verifyPort(port int) (int, error) {
-	var ln net.Listener
-	var err error
-
-	// If a user manually sets a port don't try to automatically
-	// find an open port.
-	if port != 8001 {
-		ln, err = net.Listen("tcp", ":"+strconv.Itoa(port))
-		if err != nil {
-			return port, errors.New("could not create node, listen port already in use by something else")
-		}
-	} else {
-		// Automatically look for an open port when a custom port isn't
-		// selected by a user.
-		for {
-			ln, err = net.Listen("tcp", ":"+strconv.Itoa(port))
-			if err == nil {
-				break
-			}
-			if port >= 65535 {
-				return port, errors.New("failed to find open port")
-			}
-			port++
-		}
-	}
-	if ln != nil {
-		ln.Close()
-	}
-	return port, nil
 }

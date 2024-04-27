@@ -5,11 +5,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/DataDrake/cli-ng/v2/cmd"
 	"github.com/hyprspace/hyprspace/config"
-	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/multiformats/go-multibase"
 )
@@ -19,41 +17,35 @@ var Init = cmd.Sub{
 	Name:  "init",
 	Alias: "i",
 	Short: "Initialize An Interface Config",
-	Args:  &InitArgs{},
 	Run:   InitRun,
-}
-
-// InitArgs handles the specific arguments for the init command.
-type InitArgs struct {
-	InterfaceName string
 }
 
 // InitRun handles the execution of the init command.
 func InitRun(r *cmd.Root, c *cmd.Sub) {
-	// Parse Command Arguments
-	args := c.Args.(*InitArgs)
-
-	// Parse Global Config Flag
-	configPath := r.Flags.(*GlobalFlags).Config
-	if configPath == "" {
-		configPath = "/etc/hyprspace/" + args.InterfaceName + ".json"
+	ifName := r.Flags.(*GlobalFlags).InterfaceName
+	if ifName == "" {
+		ifName = "hyprspace"
 	}
 
-	// Create New Libp2p Node
-	host, err := libp2p.New()
+	configPath := r.Flags.(*GlobalFlags).Config
+	if configPath == "" {
+		configPath = "/etc/hyprspace/" + ifName + ".json"
+	}
+
+	privKey, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
 	checkErr(err)
 
-	// Get Node's Private Key
-	keyBytes, err := crypto.MarshalPrivateKey(host.Peerstore().PrivKey(host.ID()))
+	keyBytes, err := crypto.MarshalPrivateKey(privKey)
 	checkErr(err)
 
 	// Setup an initial default command.
 	new := config.Config{
-		Interface: config.Interface{
-			Name:       args.InterfaceName,
-			ListenPort: 8001,
-			ID:         host.ID(),
-			PrivateKey: multibase.MustNewEncoder(multibase.Base58BTC).Encode(keyBytes),
+		EncodedPrivateKey: multibase.MustNewEncoder(multibase.Base58BTC).Encode(keyBytes),
+		EncodedListenAddresses: []string{
+			"/ip4/0.0.0.0/tcp/8001",
+			"/ip4/0.0.0.0/udp/8001/quic-v1",
+			"/ip6/::/tcp/8001",
+			"/ip6/::/udp/8001/quic-v1",
 		},
 		Peers: make([]config.Peer, 0),
 	}
@@ -67,21 +59,11 @@ func InitRun(r *cmd.Root, c *cmd.Sub) {
 	f, err := os.Create(configPath)
 	checkErr(err)
 
-	// Write out config to file.
 	_, err = f.Write(out)
 	checkErr(err)
 
 	err = f.Close()
 	checkErr(err)
 
-	// Print config creation message to user
 	fmt.Printf("Initialized new config at %s\n", configPath)
-	fmt.Println("To edit the config run,")
-	fmt.Println()
-	if strings.HasPrefix(configPath, "/etc/") {
-		fmt.Printf("    sudo nano %s\n", configPath)
-	} else {
-		fmt.Printf("    nano %s\n", configPath)
-	}
-	fmt.Println()
 }

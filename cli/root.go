@@ -31,7 +31,6 @@ func init() {
 	cmd.Register(&cmd.Help)
 	cmd.Register(&Init)
 	cmd.Register(&Up)
-	cmd.Register(&Down)
 	cmd.Register(&Status)
 	cmd.Register(&Peers)
 	cmd.Register(&Route)

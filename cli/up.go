@@ -17,6 +17,7 @@ import (
 
 	"github.com/DataDrake/cli-ng/v2/cmd"
 	"github.com/hyprspace/hyprspace/config"
+	hsdns "github.com/hyprspace/hyprspace/dns"
 	"github.com/hyprspace/hyprspace/p2p"
 	hsrpc "github.com/hyprspace/hyprspace/rpc"
 	"github.com/hyprspace/hyprspace/tun"
@@ -28,6 +29,7 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"github.com/multiformats/go-multibase"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/yl2chen/cidranger"
 )
 
 var (
@@ -85,11 +87,20 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 	// Create new TUN device
 	tunDev, err = tun.New(
 		cfg.Interface.Name,
-		tun.Address(cfg.Interface.Address),
+		tun.Address(cfg.Interface.BuiltinAddr.String()+"/32"),
 		tun.MTU(1420),
 	)
 	if err != nil {
 		checkErr(err)
+	}
+	allRoutes, err := cfg.PeerLookup.ByRoute.CoveredNetworks(*cidranger.AllIPv4)
+	if err != nil {
+		checkErr(err)
+	}
+	var routeOpts []tun.Option
+
+	for _, r := range allRoutes {
+		routeOpts = append(routeOpts, tun.Route(r.Network()))
 	}
 
 	// Setup System Context
@@ -142,6 +153,9 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 	// RPC server
 	go hsrpc.RpcServer(ctx, multiaddr.StringCast(fmt.Sprintf("/unix/run/hyprspace-rpc.%s.sock", cfg.Interface.Name)), host, *cfg)
 
+	// Magic DNS server
+	go hsdns.MagicDnsServer(ctx, *cfg)
+
 	// metrics endpoint
 	metricsPort, ok := os.LookupEnv("HYPRSPACE_METRICS_PORT")
 	if ok {
@@ -162,6 +176,7 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 	if err != nil {
 		checkErr(errors.New("unable to bring up tun device"))
 	}
+	checkErr(tunDev.Apply(routeOpts...))
 
 	fmt.Println("[+] Network setup complete")
 
@@ -172,10 +187,6 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 	// Initialize active streams map and packet byte array.
 	activeStreams = make(map[peer.ID]network.Stream)
 	var packet = make([]byte, 1420)
-	ip, _, err := net.ParseCIDR(cfg.Interface.Address)
-	if err != nil {
-		checkErr(errors.New("unable to parse address"))
-	}
 	for {
 		// Read in a packet from the tun device.
 		plen, err := tunDev.Iface.Read(packet)
@@ -190,23 +201,18 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 		}
 
 		dstIP := net.IPv4(packet[16], packet[17], packet[18], packet[19])
-		if ip.Equal(dstIP) {
+		if cfg.Interface.BuiltinAddr.Equal(dstIP) {
 			continue
 		}
-		var dst *peer.ID
+		var dst peer.ID
 
 		// Check route table for destination address.
-		for _, route := range cfg.Routes {
-			if route.Network.Contains(dstIP) {
-				dst = &route.Target.ID
-				break
-			}
-		}
-		if dst == nil {
-			continue
-		}
+		route, found := cfg.FindRouteForIP(dstIP)
 
-		sendPacket(*dst, packet, plen)
+		if found {
+			dst = route.Target.ID
+			sendPacket(dst, packet, plen)
+		}
 	}
 }
 
@@ -345,15 +351,7 @@ func streamHandler(stream network.Stream) {
 			}
 		}
 		stream.SetWriteDeadline(time.Now().Add(25 * time.Second))
-		dstIP := net.IPv4(packet[16], packet[17], packet[18], packet[19])
-		route, found := config.FindRouteForIP(cfg.Routes, dstIP)
-		if !found {
-			// not found means the packet is for us
-			tunDev.Iface.Write(packet[:size])
-		} else {
-			// FIXME: should decrease the TTL here
-			sendPacket(route.Target.ID, packet, int(plen))
-		}
+		tunDev.Iface.Write(packet[:size])
 	}
 }
 

@@ -15,6 +15,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
+	"github.com/yl2chen/cidranger"
 )
 
 type HyprspaceRPC struct {
@@ -55,14 +56,19 @@ func (hsr *HyprspaceRPC) Status(args *Args, reply *StatusReply) error {
 func (hsr *HyprspaceRPC) Route(args *RouteArgs, reply *RouteReply) error {
 	switch args.Action {
 	case Show:
-		var routes []RouteInfo
-		for _, r := range hsr.config.Routes {
-			connected := hsr.host.Network().Connectedness(r.Target.ID) == network.Connected
+		var routeInfos []RouteInfo
+		allRoutes, err := hsr.config.PeerLookup.ByRoute.CoveredNetworks(*cidranger.AllIPv4)
+		if err != nil {
+			return err
+		}
+		for _, r := range allRoutes {
+			rte := *r.(*config.RouteTableEntry)
+			connected := hsr.host.Network().Connectedness(rte.Target.ID) == network.Connected
 			relay := false
-			relayAddr := r.Target.ID
+			relayAddr := rte.Target.ID
 			if connected {
 			ConnLoop:
-				for _, c := range hsr.host.Network().ConnsToPeer(r.Target.ID) {
+				for _, c := range hsr.host.Network().ConnsToPeer(rte.Target.ID) {
 					for _, s := range c.GetStreams() {
 						if s.Protocol() == p2p.Protocol {
 							if _, err := c.RemoteMultiaddr().ValueForProtocol(multiaddr.P_CIRCUIT); err == nil {
@@ -70,28 +76,28 @@ func (hsr *HyprspaceRPC) Route(args *RouteArgs, reply *RouteReply) error {
 								if ra, err := c.RemoteMultiaddr().ValueForProtocol(multiaddr.P_P2P); err == nil {
 									relayAddr, err = peer.Decode(ra)
 									if err != nil {
-										relayAddr = r.Target.ID
+										relayAddr = rte.Target.ID
 									}
 								}
 							} else {
 								relay = false
-								relayAddr = r.Target.ID
+								relayAddr = rte.Target.ID
 								break ConnLoop
 							}
 						}
 					}
 				}
 			}
-			routes = append(routes, RouteInfo{
-				Network:     r.Network,
-				TargetAddr:  r.Target.ID,
+			routeInfos = append(routeInfos, RouteInfo{
+				Network:     rte.Network(),
+				TargetAddr:  rte.Target.ID,
 				RelayAddr:   relayAddr,
 				IsRelay:     relay,
 				IsConnected: connected,
 			})
 		}
 		*reply = RouteReply{
-			Routes: routes,
+			Routes: routeInfos,
 		}
 	default:
 		return errors.New("no such action")

@@ -5,6 +5,7 @@ package tun
 
 import (
 	"errors"
+	"net"
 
 	"github.com/songgao/water"
 	"github.com/vishvananda/netlink"
@@ -62,6 +63,18 @@ func (t *TUN) setAddress(address string) error {
 // all addresses within a subnet.
 func (t *TUN) setDestAddress(address string) error {
 	return errors.New("destination addresses are not supported under linux")
+}
+
+func (t *TUN) addRoute(network net.IPNet) error {
+	link, err := netlink.LinkByName(t.Iface.Name())
+	if err != nil {
+		return err
+	}
+	return netlink.RouteAdd(&netlink.Route{
+		LinkIndex: link.Attrs().Index,
+		Dst:       &network,
+		Priority:  3000,
+	})
 }
 
 // Up brings up an interface to allow it to start accepting connections.

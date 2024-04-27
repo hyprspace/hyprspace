@@ -1,5 +1,7 @@
 package tun
 
+import "net"
+
 // Option defines a TUN device modifier option.
 type Option func(tun *TUN) error
 
@@ -24,5 +26,12 @@ func MTU(mtu int) Option {
 func DestAddress(address string) Option {
 	return func(tun *TUN) error {
 		return tun.setDestAddress(address)
+	}
+}
+
+// Route adds an entry to the system route table
+func Route(dest net.IPNet) Option {
+	return func(tun *TUN) error {
+		return tun.addRoute(dest)
 	}
 }

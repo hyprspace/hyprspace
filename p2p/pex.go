@@ -102,7 +102,6 @@ func RequestPeX(ctx context.Context, host host.Host, peers []peer.ID) (addrInfos
 				s.Close()
 				return nil, err
 			}
-			fmt.Printf("[-] Got PeX peer: %s/p2p/%s\n", addrStr, idStr)
 			addrInfos = append(addrInfos, peer.AddrInfo{
 				ID:    peerId,
 				Addrs: []multiaddr.Multiaddr{ma},

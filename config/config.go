@@ -6,37 +6,55 @@ import (
 	"log"
 	"net"
 	"os"
+	"strings"
 
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/yl2chen/cidranger"
 )
 
 // Config is the main Configuration Struct for Hyprspace.
 type Config struct {
-	Path      string    `json:"-"`
-	Interface Interface `json:"interface"`
-	Peers     []Peer    `json:"peers"`
-	Routes    []Route   `json:"-"`
+	Path       string     `json:"-"`
+	Interface  Interface  `json:"interface"`
+	Peers      []Peer     `json:"peers"`
+	PeerLookup PeerLookup `json:"-"`
 }
 
 // Interface defines all of the fields that a local node needs to know about itself!
 type Interface struct {
-	Name       string  `json:"name"`
-	ID         peer.ID `json:"id"`
-	ListenPort int     `json:"listen_port"`
-	Address    string  `json:"address"`
-	PrivateKey string  `json:"private_key"`
+	Name        string  `json:"name"`
+	ID          peer.ID `json:"id"`
+	ListenPort  int     `json:"listen_port"`
+	BuiltinAddr net.IP  `json:"-"`
+	PrivateKey  string  `json:"private_key"`
 }
 
 // Peer defines a peer in the configuration. We might add more to this later.
 type Peer struct {
-	ID     peer.ID `json:"id"`
-	Routes []Route `json:"routes"`
+	ID          peer.ID `json:"id"`
+	Name        string  `json:"name"`
+	BuiltinAddr net.IP  `json:"-"`
+	Routes      []Route `json:"routes"`
 }
 
 type Route struct {
-	Target     Peer
-	NetworkStr string `json:"net"`
-	Network    net.IPNet
+	NetworkStr string    `json:"net"`
+	Network    net.IPNet `json:"-"`
+}
+
+// PeerLookup is a helper struct for quickly looking up a peer based on various parameters
+type PeerLookup struct {
+	ByRoute cidranger.Ranger
+	ByName  map[string]Peer
+}
+
+type RouteTableEntry struct {
+	network net.IPNet
+	Target  Peer
+}
+
+func (rte RouteTableEntry) Network() net.IPNet {
+	return rte.network
 }
 
 // Read initializes a config from a file.
@@ -49,7 +67,6 @@ func Read(path string) (*Config, error) {
 		Interface: Interface{
 			Name:       "hs0",
 			ListenPort: 8001,
-			Address:    "10.1.1.1/24",
 			ID:         "",
 			PrivateKey: "",
 		},
@@ -61,22 +78,52 @@ func Read(path string) (*Config, error) {
 		return nil, err
 	}
 
-	for _, p := range result.Peers {
+	result.Interface.BuiltinAddr = mkBuiltinAddr(result.Interface.ID)
+
+	result.PeerLookup.ByRoute = cidranger.NewPCTrieRanger()
+	result.PeerLookup.ByName = make(map[string]Peer)
+
+	for i, p := range result.Peers {
+		p.BuiltinAddr = mkBuiltinAddr(p.ID)
+		p.Routes = append(p.Routes, Route{
+			Network: net.IPNet{
+				IP:   p.BuiltinAddr,
+				Mask: net.IPv4Mask(255, 255, 255, 255),
+			},
+		})
 		for _, r := range p.Routes {
-			r.Target = p
-			_, n, err := net.ParseCIDR(r.NetworkStr)
-			if err != nil {
-				log.Fatal("[!] Invalid network:", r.NetworkStr)
+			if r.NetworkStr != "" {
+				_, n, err := net.ParseCIDR(r.NetworkStr)
+				if err != nil {
+					log.Fatal("[!] Invalid network:", r.NetworkStr)
+				}
+				r.Network = *n
 			}
-			r.Network = *n
-			result.Routes = append(result.Routes, r)
-			fmt.Printf("[+] Route %s via %s\n", r.Network.String(), p.ID.String())
+
+			result.PeerLookup.ByRoute.Insert(&RouteTableEntry{
+				network: r.Network,
+				Target:  p,
+			})
+
+			fmt.Printf("[+] Route %s via /p2p/%s\n", r.Network.String(), p.ID)
 		}
+		if p.Name != "" {
+			result.PeerLookup.ByName[strings.ToLower(p.Name)] = p
+		}
+		result.Peers[i] = p
 	}
 
 	// Overwrite path of config to input.
 	result.Path = path
 	return &result, nil
+}
+
+func mkBuiltinAddr(p peer.ID) net.IP {
+	builtinAddr := []byte{100, 64, 1, 2}
+	for i, b := range []byte(p) {
+		builtinAddr[(i%2)+2] ^= b
+	}
+	return net.IP(builtinAddr)
 }
 
 func FindPeer(peers []Peer, needle peer.ID) (*Peer, bool) {
@@ -88,22 +135,32 @@ func FindPeer(peers []Peer, needle peer.ID) (*Peer, bool) {
 	return nil, false
 }
 
-func FindRoute(routes []Route, needle net.IPNet) (*Route, bool) {
-	for _, r := range routes {
-		bits1, _ := r.Network.Mask.Size()
-		bits2, _ := needle.Mask.Size()
-		if r.Network.IP.Equal(needle.IP) && bits1 == bits2 {
-			return &r, true
+func (cfg Config) FindRoute(needle net.IPNet) (*RouteTableEntry, bool) {
+	networks, err := cfg.PeerLookup.ByRoute.CoveredNetworks(needle)
+	if err != nil {
+		fmt.Println(err)
+		return nil, false
+	} else if len(networks) == 0 {
+		return nil, false
+	} else if len(networks) > 1 {
+		for _, n := range networks {
+			fmt.Printf("[!] Found duplicate route %s to /p2p/%s for %s\n", n.Network(), n.(RouteTableEntry).Target.ID, needle)
 		}
 	}
-	return nil, false
+	return networks[0].(*RouteTableEntry), true
 }
 
-func FindRouteForIP(routes []Route, needle net.IP) (*Route, bool) {
-	for _, r := range routes {
-		if r.Network.Contains(needle) {
-			return &r, true
+func (cfg Config) FindRouteForIP(needle net.IP) (*RouteTableEntry, bool) {
+	networks, err := cfg.PeerLookup.ByRoute.ContainingNetworks(needle)
+	if err != nil {
+		fmt.Println(err)
+		return nil, false
+	} else if len(networks) == 0 {
+		return nil, false
+	} else if len(networks) > 1 {
+		for _, n := range networks {
+			fmt.Printf("[!] Found duplicate route %s to /p2p/%s for %s\n", n.Network(), n.(RouteTableEntry).Target.ID, needle)
 		}
 	}
-	return nil, false
+	return networks[0].(*RouteTableEntry), true
 }

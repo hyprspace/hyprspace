@@ -5,7 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"log"
+	"io/fs"
 	"net"
 	"os"
 	"os/signal"
@@ -18,12 +18,14 @@ import (
 	"github.com/DataDrake/cli-ng/v2/cmd"
 	"github.com/hyprspace/hyprspace/config"
 	"github.com/hyprspace/hyprspace/p2p"
+	hsrpc "github.com/hyprspace/hyprspace/rpc"
 	"github.com/hyprspace/hyprspace/tun"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/event"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/multiformats/go-multiaddr"
 	"github.com/multiformats/go-multibase"
 )
 
@@ -36,6 +38,10 @@ var (
 	RevLookup map[string]string
 	// activeStreams is a map of active streams to a peer
 	activeStreams map[string]network.Stream
+	// context
+	ctx context.Context
+	// context cancel function
+	ctxCancel func()
 )
 
 // Up creates and brings up a Hyprspace Interface.
@@ -112,7 +118,7 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 	}
 
 	// Setup System Context
-	ctx := context.Background()
+	ctx, ctxCancel = context.WithCancel(context.Background())
 
 	fmt.Println("[+] Creating LibP2P Node")
 
@@ -152,10 +158,13 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 	lockPath := filepath.Join(filepath.Dir(cfg.Path), cfg.Interface.Name+".lock")
 
 	// Register the application to listen for signals
-	go signalHandler(host, lockPath, dht)
+	go signalHandler(ctx, host, lockPath, dht)
 
 	// Log about various events
-	go eventLogger(host, cfg)
+	go eventLogger(ctx, host, cfg)
+
+	// RPC server
+	go hsrpc.RpcServer(ctx, multiaddr.StringCast(fmt.Sprintf("/unix/run/hyprspace-rpc.%s.sock", cfg.Interface.Name)), host, *cfg)
 
 	// Write lock to filesystem to indicate an existing running daemon.
 	err = os.WriteFile(lockPath, []byte(fmt.Sprint(os.Getpid())), os.ModePerm)
@@ -183,8 +192,13 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 	for {
 		// Read in a packet from the tun device.
 		plen, err := tunDev.Iface.Read(packet)
-		if err != nil {
-			log.Println(err)
+		if errors.Is(err, fs.ErrClosed) {
+			fmt.Println("[-] Interface closed")
+			<-ctx.Done()
+			time.Sleep(1 * time.Second)
+			return
+		} else if err != nil {
+			fmt.Println(err)
 			continue
 		}
 
@@ -255,7 +269,7 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 	}
 }
 
-func signalHandler(host host.Host, lockPath string, dht *dht.IpfsDHT) {
+func signalHandler(ctx context.Context, host host.Host, lockPath string, dht *dht.IpfsDHT) {
 	exitCh := make(chan os.Signal, 1)
 	rebootstrapCh := make(chan os.Signal, 1)
 	signal.Notify(exitCh, syscall.SIGINT, syscall.SIGTERM)
@@ -263,6 +277,8 @@ func signalHandler(host host.Host, lockPath string, dht *dht.IpfsDHT) {
 
 	for {
 		select {
+		case <-ctx.Done():
+			return
 		case <-rebootstrapCh:
 			fmt.Println("[-] Rebootstrapping on SIGUSR1")
 			host.ConnManager().TrimOpenConns(context.Background())
@@ -279,17 +295,20 @@ func signalHandler(host host.Host, lockPath string, dht *dht.IpfsDHT) {
 
 			fmt.Println("Received signal, shutting down...")
 
-			// Exit the application.
-			os.Exit(0)
+			tunDev.Iface.Close()
+			tunDev.Down()
+			ctxCancel()
 		}
 	}
 }
 
-func eventLogger(host host.Host, cfg *config.Config) {
+func eventLogger(ctx context.Context, host host.Host, cfg *config.Config) {
 	subCon, err := host.EventBus().Subscribe(new(event.EvtPeerConnectednessChanged))
 	checkErr(err)
 	for {
 		select {
+		case <-ctx.Done():
+			return
 		case ev := <-subCon.Out():
 			evt := ev.(event.EvtPeerConnectednessChanged)
 			for vpnIp, vpnPeer := range cfg.Peers {

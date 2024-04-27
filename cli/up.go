@@ -67,9 +67,9 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 
 	// Read in configuration from file.
 	cfg2, err := config.Read(configPath)
+	checkErr(err)
 	cfg2.Interface = ifName
 	cfg = cfg2
-	checkErr(err)
 
 	fmt.Println("[+] Creating TUN Device")
 

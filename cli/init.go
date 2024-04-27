@@ -53,7 +53,7 @@ func InitRun(r *cmd.Root, c *cmd.Sub) {
 			Name:       args.InterfaceName,
 			ListenPort: 8001,
 			Address:    "10.1.1.1/24",
-			ID:         host.ID().Pretty(),
+			ID:         host.ID(),
 			PrivateKey: multibase.MustNewEncoder(multibase.Base58BTC).Encode(keyBytes),
 		},
 	}

@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"syscall"
 	"time"
@@ -30,14 +29,12 @@ import (
 )
 
 var (
+	cfg *config.Config
 	// iface is the tun device used to pass packets between
 	// Hyprspace and the user's machine.
 	tunDev *tun.TUN
-	// RevLookup allow quick lookups of an incoming stream
-	// for security before accepting or responding to any data.
-	RevLookup map[string]string
 	// activeStreams is a map of active streams to a peer
-	activeStreams map[string]network.Stream
+	activeStreams map[peer.ID]network.Stream
 	// context
 	ctx context.Context
 	// context cancel function
@@ -76,43 +73,18 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 	}
 
 	// Read in configuration from file.
-	cfg, err := config.Read(configPath)
+	cfg2, err := config.Read(configPath)
+	cfg = cfg2
 	checkErr(err)
-
-	// Setup reverse lookup hash map for authentication.
-	RevLookup = make(map[string]string, len(cfg.Peers))
-	for ip, id := range cfg.Peers {
-		RevLookup[id.ID] = ip
-	}
 
 	fmt.Println("[+] Creating TUN Device")
 
-	if runtime.GOOS == "darwin" {
-		if len(cfg.Peers) > 1 {
-			checkErr(errors.New("cannot create interface macos does not support more than one peer"))
-		}
-
-		// Grab ip address of only peer in config
-		var destPeer string
-		for ip := range cfg.Peers {
-			destPeer = ip
-		}
-
-		// Create new TUN device
-		tunDev, err = tun.New(
-			cfg.Interface.Name,
-			tun.Address(cfg.Interface.Address),
-			tun.DestAddress(destPeer),
-			tun.MTU(1420),
-		)
-	} else {
-		// Create new TUN device
-		tunDev, err = tun.New(
-			cfg.Interface.Name,
-			tun.Address(cfg.Interface.Address),
-			tun.MTU(1420),
-		)
-	}
+	// Create new TUN device
+	tunDev, err = tun.New(
+		cfg.Interface.Name,
+		tun.Address(cfg.Interface.Address),
+		tun.MTU(1420),
+	)
 	if err != nil {
 		checkErr(err)
 	}
@@ -137,23 +109,14 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 	checkErr(err)
 	host.SetStreamHandler(p2p.PeXProtocol, p2p.NewPeXStreamHandler(host, cfg))
 
-	for _, id := range cfg.Peers {
-		p, err := peer.Decode(id.ID)
-		checkErr(err)
-		host.ConnManager().Protect(p, "/hyprspace/peer")
-	}
-
-	// Setup Peer Table for Quick Packet --> Dest ID lookup
-	peerTable := make(map[string]peer.ID)
-	for ip, id := range cfg.Peers {
-		peerTable[ip], err = peer.Decode(id.ID)
-		checkErr(err)
+	for _, p := range cfg.Peers {
+		host.ConnManager().Protect(p.ID, "/hyprspace/peer")
 	}
 
 	fmt.Println("[+] Setting Up Node Discovery via DHT")
 
 	// Setup P2P Discovery
-	go p2p.Discover(ctx, host, dht, peerTable)
+	go p2p.Discover(ctx, host, dht, cfg.Peers)
 
 	// Configure path for lock
 	lockPath := filepath.Join(filepath.Dir(cfg.Path), cfg.Interface.Name+".lock")
@@ -165,7 +128,7 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 	go signalHandler(ctx, host, lockPath, dht)
 
 	// Log about various events
-	go eventLogger(ctx, host, cfg)
+	go eventLogger(ctx, host)
 
 	// RPC server
 	go hsrpc.RpcServer(ctx, multiaddr.StringCast(fmt.Sprintf("/unix/run/hyprspace-rpc.%s.sock", cfg.Interface.Name)), host, *cfg)
@@ -187,7 +150,7 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 	// + ----------------------------------------+
 
 	// Initialize active streams map and packet byte array.
-	activeStreams = make(map[string]network.Stream)
+	activeStreams = make(map[peer.ID]network.Stream)
 	var packet = make([]byte, 1420)
 	ip, _, err := net.ParseCIDR(cfg.Interface.Address)
 	if err != nil {
@@ -207,23 +170,24 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 		}
 
 		dstIP := net.IPv4(packet[16], packet[17], packet[18], packet[19])
-		dst := dstIP.String()
+		if ip.Equal(dstIP) {
+			continue
+		}
+		var dst *config.Peer
 
 		// Check route table for destination address.
-		for route, _ := range cfg.Routes {
-			_, network, _ := net.ParseCIDR(route)
-			if network.Contains(dstIP) {
-				src := net.IPv4(packet[12], packet[13], packet[14], packet[15])
-				_, ok := peerTable[dst]
-				// Only rewrite if initiator is us or receiver is not a known peer
-				if src.Equal(ip) && !ok {
-					dst = cfg.Routes[route].IP
-				}
+		for _, route := range cfg.Routes {
+			if route.Network.Contains(dstIP) {
+				dst = &route.Target
+				break
 			}
+		}
+		if dst == nil {
+			continue
 		}
 
 		// Check if we already have an open connection to the destination peer.
-		stream, ok := activeStreams[dst]
+		stream, ok := activeStreams[dst.ID]
 		if ok {
 			// Write out the packet's length to the libp2p stream to ensure
 			// we know the full size of the packet at the other end.
@@ -240,36 +204,32 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 			// If we encounter an error when writing to a stream we should
 			// close that stream and delete it from the active stream map.
 			stream.Close()
-			delete(activeStreams, dst)
+			delete(activeStreams, dst.ID)
 		}
 
-		// Check if the destination of the packet is a known peer to
-		// the interface.
-		if peer, ok := peerTable[dst]; ok {
-			stream, err = host.NewStream(ctx, peer, p2p.Protocol)
-			if err != nil {
-				fmt.Println("[!] Failed to open stream to " + dst)
-				go p2p.Rediscover()
-				continue
-			}
-			stream.SetWriteDeadline(time.Now().Add(25 * time.Second))
-			// Write packet length
-			err = binary.Write(stream, binary.LittleEndian, uint16(plen))
-			if err != nil {
-				stream.Close()
-				continue
-			}
-			// Write the packet
-			_, err = stream.Write(packet[:plen])
-			if err != nil {
-				stream.Close()
-				continue
-			}
-
-			// If all succeeds when writing the packet to the stream
-			// we should reuse this stream by adding it active streams map.
-			activeStreams[dst] = stream
+		stream, err = host.NewStream(ctx, dst.ID, p2p.Protocol)
+		if err != nil {
+			fmt.Println("[!] Failed to open stream to " + dst.ID.String())
+			go p2p.Rediscover()
+			continue
 		}
+		stream.SetWriteDeadline(time.Now().Add(25 * time.Second))
+		// Write packet length
+		err = binary.Write(stream, binary.LittleEndian, uint16(plen))
+		if err != nil {
+			stream.Close()
+			continue
+		}
+		// Write the packet
+		_, err = stream.Write(packet[:plen])
+		if err != nil {
+			stream.Close()
+			continue
+		}
+
+		// If all succeeds when writing the packet to the stream
+		// we should reuse this stream by adding it active streams map.
+		activeStreams[dst.ID] = stream
 	}
 }
 
@@ -306,7 +266,7 @@ func signalHandler(ctx context.Context, host host.Host, lockPath string, dht *dh
 	}
 }
 
-func eventLogger(ctx context.Context, host host.Host, cfg *config.Config) {
+func eventLogger(ctx context.Context, host host.Host) {
 	subCon, err := host.EventBus().Subscribe(new(event.EvtPeerConnectednessChanged))
 	checkErr(err)
 	for {
@@ -315,14 +275,14 @@ func eventLogger(ctx context.Context, host host.Host, cfg *config.Config) {
 			return
 		case ev := <-subCon.Out():
 			evt := ev.(event.EvtPeerConnectednessChanged)
-			for vpnIp, vpnPeer := range cfg.Peers {
-				if vpnPeer.ID == evt.Peer.Pretty() {
+			for _, vpnPeer := range cfg.Peers {
+				if vpnPeer.ID == evt.Peer {
 					if evt.Connectedness == network.Connected {
 						for _, c := range host.Network().ConnsToPeer(evt.Peer) {
-							fmt.Printf("[+] Connected to %s at %s/p2p/%s\n", vpnIp, c.RemoteMultiaddr().String(), evt.Peer.Pretty())
+							fmt.Printf("[+] Connected to %s/p2p/%s\n", c.RemoteMultiaddr().String(), evt.Peer.String())
 						}
 					} else if evt.Connectedness == network.NotConnected {
-						fmt.Printf("[!] Disconnected from %s\n", vpnIp)
+						fmt.Printf("[!] Disconnected from %s\n", evt.Peer.String())
 					}
 					break
 				}
@@ -333,7 +293,7 @@ func eventLogger(ctx context.Context, host host.Host, cfg *config.Config) {
 
 func streamHandler(stream network.Stream) {
 	// If the remote node ID isn't in the list of known nodes don't respond.
-	if _, ok := RevLookup[stream.Conn().RemotePeer().Pretty()]; !ok {
+	if _, ok := config.FindPeer(cfg.Peers, stream.Conn().RemotePeer()); !ok {
 		stream.Reset()
 		return
 	}

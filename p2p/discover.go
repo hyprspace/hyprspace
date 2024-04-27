@@ -5,16 +5,16 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/hyprspace/hyprspace/config"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
-	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 var discoverNow = make(chan bool)
 
 // Discover starts up a DHT based discovery system finding and adding nodes with the same rendezvous string.
-func Discover(ctx context.Context, h host.Host, dht *dht.IpfsDHT, peerTable map[string]peer.ID) {
+func Discover(ctx context.Context, h host.Host, dht *dht.IpfsDHT, peers []config.Peer) {
 	dur := time.Second * 1
 	ticker := time.NewTicker(dur)
 	defer ticker.Stop()
@@ -29,9 +29,9 @@ func Discover(ctx context.Context, h host.Host, dht *dht.IpfsDHT, peerTable map[
 			ticker.Reset(time.Millisecond * 1)
 		case <-ticker.C:
 			connectedToAny := false
-			for _, id := range peerTable {
-				if h.Network().Connectedness(id) != network.Connected {
-					addrs, err := dht.FindPeer(ctx, id)
+			for _, p := range peers {
+				if h.Network().Connectedness(p.ID) != network.Connected {
+					addrs, err := dht.FindPeer(ctx, p.ID)
 					if err != nil {
 						continue
 					}

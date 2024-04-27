@@ -29,12 +29,15 @@ func checkErrPeX(err error, stream network.Stream) bool {
 }
 
 func NewPeXStreamHandler(host host.Host, cfg *config.Config) func(network.Stream) {
-	revLookup := make(map[string]string, len(cfg.Peers))
-	for ip, id := range cfg.Peers {
-		revLookup[id.ID] = ip
-	}
 	return func(stream network.Stream) {
-		if _, ok := revLookup[stream.Conn().RemotePeer().String()]; !ok {
+		found := false
+		for _, p := range cfg.Peers {
+			if p.ID == stream.Conn().RemotePeer() {
+				found = true
+				break
+			}
+		}
+		if !found {
 			stream.Reset()
 			return
 		}
@@ -47,12 +50,8 @@ func NewPeXStreamHandler(host host.Host, cfg *config.Config) func(network.Stream
 		if str == "r" {
 			// peer requests addresses
 			for _, p := range cfg.Peers {
-				peerId, err := peer.Decode(p.ID)
-				if checkErrPeX(err, stream) {
-					return
-				}
-				if peerId != stream.Conn().RemotePeer() {
-					for _, c := range host.Network().ConnsToPeer(peerId) {
+				if p.ID != stream.Conn().RemotePeer() {
+					for _, c := range host.Network().ConnsToPeer(p.ID) {
 						_, err := stream.Write([]byte(fmt.Sprintf("%s|%s\n", c.RemotePeer().String(), c.RemoteMultiaddr().String())))
 						if checkErrPeX(err, stream) {
 							return
@@ -114,17 +113,13 @@ func PeXService(ctx context.Context, host host.Host, cfg *config.Config) {
 		case ev := <-subCon.Out():
 			evt := ev.(event.EvtPeerConnectednessChanged)
 			for _, vpnPeer := range cfg.Peers {
-				if vpnPeer.ID == evt.Peer.String() {
+				if vpnPeer.ID == evt.Peer {
 					if evt.Connectedness == network.Connected {
 						go RequestPeX(ctx, host, []peer.ID{evt.Peer})
 					} else if evt.Connectedness == network.NotConnected {
 						peers := []peer.ID{}
 						for _, p := range cfg.Peers {
-							peerId, err := peer.Decode(p.ID)
-							if err != nil {
-								continue
-							}
-							peers = append(peers, peerId)
+							peers = append(peers, p.ID)
 						}
 						go RequestPeX(ctx, host, peers)
 					}

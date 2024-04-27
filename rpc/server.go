@@ -11,7 +11,6 @@ import (
 	"github.com/hyprspace/hyprspace/config"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
-	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 )
 
@@ -23,15 +22,11 @@ type HyprspaceRPC struct {
 func (hsr *HyprspaceRPC) Status(args *Args, reply *StatusReply) error {
 	netPeersCurrent := 0
 	var netPeerAddrsCurrent []string
-	for _, id := range hsr.config.Peers {
-		peerId, err := peer.Decode(id.ID)
-		if err != nil {
-			return err
-		}
-		if hsr.host.Network().Connectedness(peerId) == network.Connected {
+	for _, p := range hsr.config.Peers {
+		if hsr.host.Network().Connectedness(p.ID) == network.Connected {
 			netPeersCurrent = netPeersCurrent + 1
-			for _, c := range hsr.host.Network().ConnsToPeer(peerId) {
-				netPeerAddrsCurrent = append(netPeerAddrsCurrent, fmt.Sprintf("%s/p2p/%s", c.RemoteMultiaddr().String(), peerId.String()))
+			for _, c := range hsr.host.Network().ConnsToPeer(p.ID) {
+				netPeerAddrsCurrent = append(netPeerAddrsCurrent, fmt.Sprintf("%s/p2p/%s", c.RemoteMultiaddr().String(), p.ID.String()))
 			}
 		}
 	}

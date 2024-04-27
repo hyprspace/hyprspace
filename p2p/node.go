@@ -30,7 +30,7 @@ const Protocol = "/hyprspace/0.0.1"
 
 var bootstrapTriggerChan = make(chan bool)
 
-func getExtraBootstrapNodes(addr ma.Multiaddr) (nodesList []string) {
+func getExtraPeers(addr ma.Multiaddr) (nodesList []string) {
 	nodesList = []string{}
 	ip4, err := addr.ValueForProtocol(ma.P_IP4)
 	if err != nil {
@@ -40,7 +40,7 @@ func getExtraBootstrapNodes(addr ma.Multiaddr) (nodesList []string) {
 	if err != nil {
 		return
 	}
-	resp, err := http.PostForm("http://"+ip4+":"+port+"/api/v0/swarm/addrs", url.Values{})
+	resp, err := http.PostForm("http://"+ip4+":"+port+"/api/v0/swarm/peers", url.Values{})
 
 	if err != nil {
 		return
@@ -52,14 +52,39 @@ func getExtraBootstrapNodes(addr ma.Multiaddr) (nodesList []string) {
 	if err != nil {
 		return
 	}
-	var obj = map[string]map[string][]string{}
+	var obj = map[string][]map[string]interface{}{}
 	json.Unmarshal([]byte(apiResponse), &obj)
-	for k, v := range obj["Addrs"] {
-		for _, addr := range v {
-			nodesList = append(nodesList, (addr + "/p2p/" + k))
-		}
+	for _, v := range obj["Peers"] {
+		nodesList = append(nodesList, (v["Addr"].(string) + "/p2p/" + v["Peer"].(string)))
 	}
 	return
+}
+
+func getExtraBootstrapNodes(addr ma.Multiaddr) (nodesList []string) {
+	nodesList = []string{}
+	ip4, err := addr.ValueForProtocol(ma.P_IP4)
+	if err != nil {
+		return
+	}
+	port, err := addr.ValueForProtocol(ma.P_TCP)
+	if err != nil {
+		return
+	}
+	resp, err := http.PostForm("http://"+ip4+":"+port+"/api/v0/bootstrap", url.Values{})
+
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+
+	apiResponse, err := ioutil.ReadAll(resp.Body)
+
+	if err != nil {
+		return
+	}
+	var obj = map[string][]string{}
+	json.Unmarshal([]byte(apiResponse), &obj)
+	return obj["Peers"]
 }
 
 // CreateNode creates an internal Libp2p nodes and returns it and it's DHT Discovery service.
@@ -154,6 +179,21 @@ func CreateNode(ctx context.Context, inputKey []byte, port int, handler network.
 		return node, nil, err
 	}
 
+	ipfsApiStr, ok := os.LookupEnv("HYPRSPACE_IPFS_API")
+	if ok {
+		ipfsApiAddr, err := ma.NewMultiaddr(ipfsApiStr)
+		if err == nil {
+			fmt.Println("[+] Getting additional peers from IPFS API")
+			extraPeers, err := parsePeerAddrs(getExtraPeers(ipfsApiAddr))
+			if err == nil {
+				fmt.Printf("[+] %d additional addresses\n", len(extraPeers))
+				for _, p := range extraPeers {
+					node.Peerstore().AddAddrs(p.ID, p.Addrs, 5*time.Minute)
+				}
+			}
+		}
+	}
+
 	// Create DHT Subsystem
 	dhtOut, err = dht.New(
 		ctx,
@@ -166,9 +206,9 @@ func CreateNode(ctx context.Context, inputKey []byte, port int, handler network.
 			if ok {
 				ipfsApiAddr, err := ma.NewMultiaddr(ipfsApiStr)
 				if err == nil {
-					fmt.Println("[+] Getting additional peers from IPFS API")
+					fmt.Println("[+] Getting additional bootstrap nodes from IPFS API")
 					extraBootstrapNodes = getExtraBootstrapNodes(ipfsApiAddr)
-					fmt.Printf("[+] %d additional addresses\n", len(extraBootstrapNodes))
+					fmt.Printf("[+] %d additional bootstrap nodes\n", len(extraBootstrapNodes))
 				}
 			}
 			dynamicBootstrapPeers, err := parsePeerAddrs(extraBootstrapNodes)

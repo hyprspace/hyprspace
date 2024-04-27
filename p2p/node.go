@@ -157,7 +157,7 @@ func CreateNode(ctx context.Context, inputKey []byte, port int, handler network.
 					}
 				}()
 				return r
-			}, time.Second*1),
+			}),
 		),
 		libp2p.WithDialTimeout(time.Second*5),
 		libp2p.FallbackDefaults,

@@ -112,8 +112,8 @@ func CreateNode(ctx context.Context, inputKey []byte, port int, handler network.
 		maybePrivateNet = libp2p.PrivateNetwork(key)
 	}
 
-	ip6quic := fmt.Sprintf("/ip6/::/udp/%d/quic", port)
-	ip4quic := fmt.Sprintf("/ip4/0.0.0.0/udp/%d/quic", port)
+	ip6quic := fmt.Sprintf("/ip6/::/udp/%d/quic-v1", port)
+	ip4quic := fmt.Sprintf("/ip4/0.0.0.0/udp/%d/quic-v1", port)
 
 	ip6tcp := fmt.Sprintf("/ip6/::/tcp/%d", port)
 	ip4tcp := fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", port)
@@ -169,13 +169,13 @@ func CreateNode(ctx context.Context, inputKey []byte, port int, handler network.
 	// Define Bootstrap Nodes.
 	peers := []string{
 		"/ip4/152.67.79.222/tcp/110/p2p/12D3KooWQWsHPUUeFhe4b6pyCaD1hBoj8j6Z7S7kTznRTh1p1eVt",
-		"/ip4/152.67.79.222/udp/110/quic/p2p/12D3KooWQWsHPUUeFhe4b6pyCaD1hBoj8j6Z7S7kTznRTh1p1eVt",
+		"/ip4/152.67.79.222/udp/110/quic-v1/p2p/12D3KooWQWsHPUUeFhe4b6pyCaD1hBoj8j6Z7S7kTznRTh1p1eVt",
 		"/ip4/152.67.79.222/tcp/995/p2p/QmbrAHuh4RYcyN9fWePCZMVmQjbaNXtyvrDCWz4VrchbXh",
-		"/ip4/152.67.79.222/udp/995/quic/p2p/QmbrAHuh4RYcyN9fWePCZMVmQjbaNXtyvrDCWz4VrchbXh",
+		"/ip4/152.67.79.222/udp/995/quic-v1/p2p/QmbrAHuh4RYcyN9fWePCZMVmQjbaNXtyvrDCWz4VrchbXh",
 		"/ip4/95.216.8.12/tcp/110/p2p/Qmd7QHZU8UjfYdwmjmq1SBh9pvER9AwHpfwQvnvNo3HBBo",
-		"/ip4/95.216.8.12/udp/110/quic/p2p/Qmd7QHZU8UjfYdwmjmq1SBh9pvER9AwHpfwQvnvNo3HBBo",
+		"/ip4/95.216.8.12/udp/110/quic-v1/p2p/Qmd7QHZU8UjfYdwmjmq1SBh9pvER9AwHpfwQvnvNo3HBBo",
 		"/ip4/95.216.8.12/tcp/995/p2p/QmYs4xNBby2fTs8RnzfXEk161KD4mftBfCiR8yXtgGPj4J",
-		"/ip4/95.216.8.12/udp/995/quic/p2p/QmYs4xNBby2fTs8RnzfXEk161KD4mftBfCiR8yXtgGPj4J",
+		"/ip4/95.216.8.12/udp/995/quic-v1/p2p/QmYs4xNBby2fTs8RnzfXEk161KD4mftBfCiR8yXtgGPj4J",
 		"/dnsaddr/bootstrap.libp2p.io/p2p/12D3KooWEZXjE41uU4EL2gpkAQeDXYok6wghN7wwNVPF5bwkaNfS",
 		"/dnsaddr/bootstrap.libp2p.io/p2p/QmNnooDu7bfjPFoTZYxMNLWUQJyrVwtbZg5gBMjTezGAJN",
 		"/dnsaddr/bootstrap.libp2p.io/p2p/QmQCU2EcMqAqQPR2i9bChDtGNJchTbq5TbXJJ16u19uLTa",

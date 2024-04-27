@@ -1,7 +1,6 @@
 <img src="hyprspace.png" width="150">
 
 # Hyprspace
-> :warning: This project has been archived and is no longer maintained.
 
 A Lightweight VPN Built on top of IPFS & Libp2p for Truly Distributed Networks. 
 
@@ -46,15 +45,6 @@ If anyone else has some use cases please add them! Pull requests welcome!
 ### Prerequisites
 
 If you're running Hyprspace on Windows you'll need to install [tap-windows](http://build.openvpn.net/downloads/releases/).
-
-### Installation
-
-1. Go to Hyprspace Releases (over there -->)
-2. Copy the link for your corresponding OS and Architecture.
-3. Run `sudo mkdir -p /usr/local/bin/`
-4. Run `sudo curl -L "PATH-TO-RELEASE" -o /usr/local/bin/hyprspace`
-5. Run `sudo chmod a+x /usr/local/bin/hyprspace`
-6. (Optional) Run `sudo ln -s /usr/local/bin/hyprspace /usr/bin/hyprspace`
 
 ## Usage
 

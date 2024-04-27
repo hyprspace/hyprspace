@@ -31,7 +31,6 @@ func init() {
 	cmd.Register(&Init)
 	cmd.Register(&Up)
 	cmd.Register(&Down)
-	cmd.Register(&Update)
 	cmd.Register(&cmd.Version)
 }
 

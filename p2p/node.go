@@ -2,8 +2,13 @@ package p2p
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+	"net/url"
+	"os"
 	"sync"
 
 	"github.com/ipfs/go-datastore"
@@ -12,6 +17,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p-core/pnet"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	libp2pquic "github.com/libp2p/go-libp2p-quic-transport"
 	"github.com/libp2p/go-tcp-transport"
@@ -21,6 +27,35 @@ import (
 // Protocol is a descriptor for the Hyprspace P2P Protocol.
 const Protocol = "/hyprspace/0.0.1"
 
+func getExtraBootstrapNodes(addr ma.Multiaddr) (nodesList []string) {
+	nodesList = []string{}
+	ip4, err := addr.ValueForProtocol(ma.P_IP4)
+	if err != nil {
+		return
+	}
+	port, err := addr.ValueForProtocol(ma.P_TCP)
+	if err != nil {
+		return
+	}
+	resp, err := http.PostForm("http://"+ip4+":"+port+"/api/v0/swarm/addrs", url.Values{})
+
+	defer resp.Body.Close()
+
+	apiResponse, err := ioutil.ReadAll(resp.Body)
+
+	if err != nil {
+		return
+	}
+	var obj = map[string]map[string][]string{}
+	json.Unmarshal([]byte(apiResponse), &obj)
+	for k, v := range obj["Addrs"] {
+		for _, addr := range v {
+			nodesList = append(nodesList, (addr + "/p2p/" + k))
+		}
+	}
+	return
+}
+
 // CreateNode creates an internal Libp2p nodes and returns it and it's DHT Discovery service.
 func CreateNode(ctx context.Context, inputKey string, port int, handler network.StreamHandler) (node host.Host, dhtOut *dht.IpfsDHT, err error) {
 	// Unmarshal Private Key
@@ -29,21 +64,41 @@ func CreateNode(ctx context.Context, inputKey string, port int, handler network.
 		return
 	}
 
+	swarmKey, err := os.Open(os.Getenv("HYPRSPACE_SWARM_KEY"))
+	if err != nil {
+		return
+	}
+	extraBootstrapNodes := []string{}
+	ipfsApiStr, ok := os.LookupEnv("HYPRSPACE_IPFS_API")
+	if ok {
+		ipfsApiAddr, err := ma.NewMultiaddr(ipfsApiStr)
+		if err == nil {
+			fmt.Println("[+] Getting additional peers from IPFS API")
+			extraBootstrapNodes = getExtraBootstrapNodes(ipfsApiAddr)
+		}
+	}
+
 	ip6quic := fmt.Sprintf("/ip6/::/udp/%d/quic", port)
 	ip4quic := fmt.Sprintf("/ip4/0.0.0.0/udp/%d/quic", port)
 
 	ip6tcp := fmt.Sprintf("/ip6/::/tcp/%d", port)
 	ip4tcp := fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", port)
 
+	key, _ := pnet.DecodeV1PSK(swarmKey)
+
 	// Create libp2p node
 	node, err = libp2p.New(
-		libp2p.ListenAddrStrings(ip6quic, ip4quic, ip6tcp, ip4tcp),
+		libp2p.PrivateNetwork(key),
+		libp2p.ListenAddrStrings(ip6tcp, ip4tcp, ip4quic, ip6quic),
 		libp2p.Identity(privateKey),
 		libp2p.DefaultSecurity,
 		libp2p.NATPortMap(),
 		libp2p.DefaultMuxers,
 		libp2p.Transport(libp2pquic.NewTransport),
 		libp2p.Transport(tcp.NewTCPTransport),
+		libp2p.EnableHolePunching(),
+		libp2p.EnableRelayService(),
+		libp2p.EnableNATService(),
 		libp2p.FallbackDefaults,
 	)
 	if err != nil {
@@ -58,17 +113,15 @@ func CreateNode(ctx context.Context, inputKey string, port int, handler network.
 
 	// Define Bootstrap Nodes.
 	peers := []string{
-		"/dnsaddr/bootstrap.libp2p.io/p2p/QmcZf59bWwK5XFi76CZX8cbJ4BhTzzA3gU1ZjYZcYW3dwt",
-		"/ip4/104.131.131.82/tcp/4001/p2p/QmaCpDMGvV2BGHeYERUEnRQAwe3N8SzbUtfsmvsqQLuvuJ",
-		"/ip4/104.131.131.82/udp/4001/quic/p2p/QmaCpDMGvV2BGHeYERUEnRQAwe3N8SzbUtfsmvsqQLuvuJ",
-		"/dnsaddr/bootstrap.libp2p.io/p2p/QmNnooDu7bfjPFoTZYxMNLWUQJyrVwtbZg5gBMjTezGAJN",
-		"/dnsaddr/bootstrap.libp2p.io/p2p/QmQCU2EcMqAqQPR2i9bChDtGNJchTbq5TbXJJ16u19uLTa",
-		"/dnsaddr/bootstrap.libp2p.io/p2p/QmbLHAnMoJPWSCR5Zhtx6BHJX9KiKNN6tpvbUcqanj75Nb",
+		"/ip4/168.235.67.108/tcp/4001/p2p/QmRMA5pWXtfuW1y5w2t9gYxrDDD6bPRLKdWAYnHTeCxZMm",
+		"/ip4/95.216.8.12/tcp/4001/p2p/Qmd7QHZU8UjfYdwmjmq1SBh9pvER9AwHpfwQvnvNo3HBBo",
+		"/ip6/2001:41d0:800:1402::3f16:3fb5/tcp/4001/p2p/12D3KooWDUgNsoLVauCDpRAo54mc4whoBudgeXQnZZK2iVYhBLCN",
+		"/ip6/2001:818:da65:e400:a553:fbc1:f0b1:5743/tcp/4001/p2p/12D3KooWC1RZxLvAeEFNTZWk1FWc1sZZ3yemF4FNNRYa3X854KJ8",
 	}
 
 	// Convert Bootstap Nodes into usable addresses.
 	BootstrapPeers := make(map[peer.ID]*peer.AddrInfo, len(peers))
-	for _, addrStr := range peers {
+	for _, addrStr := range append(peers, extraBootstrapNodes...) {
 		addr, err := ma.NewMultiaddr(addrStr)
 		if err != nil {
 			return node, dhtOut, err

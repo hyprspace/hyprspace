@@ -11,19 +11,16 @@ var Status = cmd.Sub{
 	Name:  "status",
 	Alias: "s",
 	Short: "Display Hyprspace daemon status",
-	Args:  &StatusArgs{},
 	Run:   StatusRun,
 }
 
-type StatusArgs struct {
-	InterfaceName string
-}
-
 func StatusRun(r *cmd.Root, c *cmd.Sub) {
-	// Parse Command Args
-	args := c.Args.(*StatusArgs)
+	ifName := r.Flags.(*GlobalFlags).InterfaceName
+	if ifName == "" {
+		ifName = "hyprspace"
+	}
 
-	status := rpc.Status(args.InterfaceName)
+	status := rpc.Status(ifName)
 	fmt.Println("PeerID:", status.PeerID)
 	fmt.Println("Swarm peers:", status.SwarmPeersCurrent)
 	fmt.Printf("Connected VPN nodes: %d/%d\n", status.NetPeersCurrent, status.NetPeersMax)

@@ -1,6 +1,6 @@
 module github.com/hyprspace/hyprspace
 
-go 1.16
+go 1.18
 
 require (
 	github.com/DataDrake/cli-ng/v2 v2.0.2

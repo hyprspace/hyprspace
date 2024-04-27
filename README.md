@@ -90,19 +90,19 @@ sudo hyprspace init hs1
 
 Now that we've got a set of configurations we'll want to
 tell the machines about each other. By default Hyprspace will
-put the interface configurations in `/etc/hyprspace/interface-name.yaml`.
+put the interface configurations in `/etc/hyprspace/interface-name.json`.
 So for our example we'll run
 
 ###### Local Machine
 ```bash
-sudo nano /etc/hyprspace/hs0.yaml
+sudo nano /etc/hyprspace/hs0.json
 ```
 
 and
 
 ###### Remote Machine
 ```bash
-sudo nano /etc/hyprspace/hs1.yaml
+sudo nano /etc/hyprspace/hs1.json
 ```
 
 ### Update Peer Configs
@@ -111,14 +111,20 @@ Now in each config we'll add the other machine's ID as a peer.
 You can find each machine's ID at the top of their configuration file.
 Update,
 
-```yaml
-peers: {}
+```json
+{
+  "peers": {}
+}
 ```
 to 
-```yaml
-peers:
-  10.1.1.2:
-    id: YOUR-OTHER-PEER-ID
+```json
+{
+  "peers": {
+    "10.1.1.2": {
+      "id": "YOUR-OTHER-PEER-ID"
+    }
+  }
+}
 ```
 
 Notice here we'll have to pick one of our machines to be `10.1.1.1` 
@@ -168,49 +174,6 @@ sudo hyprspace down hs1
 
 WireGuard is a registered trademark of Jason A. Donenfeld.
 
-
-## Routes
-
-### Prepare each route node:
-
-```
-# sysctl -n net.ipv4.ip_forward
-0
-# sysctl -w net.ipv4.ip_forward=1
-iptables -t nat -A POSTROUTING -s <YOUR_TUN_NET>/24 -o eth0 -j MASQUERADE
-iptables -A FORWARD 1 -i <HS_TUN> -o <DEV_GATEWAY> -j ACCEPT
-iptables -A FORWARD 1 -i <DEV_GATEWAY> -o <HS_TUN> -j ACCEPT
-
-```
-Determine gateway router:
-```
-# curl ifconfg.me
-<GATEWAY_ROUTER>
-```
-
-### Configure client:
-Config hyprspace yaml configuration file:
-```
-interface:
-  ...
-peers:
-  ID: ...
-  ...
-routes:
-  192.168.3.0/24:
-    ip: 10.0.0.3
-  0.0.0.0/0:
-    ip: 10.0.0.1
-
-```
-Prepare routes
-```
-One for each route:
-# ip route add <GATEWAY_ROUTER> via <YOUR_GATEWAY> 
-
-And all traffic for hyprspace tun
-# ip route add default dev <HS_TUN> metric 1
-```
 ## License
 
 Copyright 2021-2022 Alec Scott <hi@alecbcs.com>

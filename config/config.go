@@ -1,41 +1,41 @@
 package config
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net"
 	"os"
 
 	"github.com/libp2p/go-libp2p/core/peer"
-	"gopkg.in/yaml.v2"
 )
 
 // Config is the main Configuration Struct for Hyprspace.
 type Config struct {
-	Path      string    `yaml:"path,omitempty"`
-	Interface Interface `yaml:"interface"`
-	Peers     []Peer    `yaml:"peers"`
-	Routes    []Route
+	Path      string    `json:"-"`
+	Interface Interface `json:"interface"`
+	Peers     []Peer    `json:"peers"`
+	Routes    []Route   `json:"-"`
 }
 
 // Interface defines all of the fields that a local node needs to know about itself!
 type Interface struct {
-	Name       string  `yaml:"name"`
-	ID         peer.ID `yaml:"id"`
-	ListenPort int     `yaml:"listen_port"`
-	Address    string  `yaml:"address"`
-	PrivateKey string  `yaml:"private_key"`
+	Name       string  `json:"name"`
+	ID         peer.ID `json:"id"`
+	ListenPort int     `json:"listen_port"`
+	Address    string  `json:"address"`
+	PrivateKey string  `json:"private_key"`
 }
 
 // Peer defines a peer in the configuration. We might add more to this later.
 type Peer struct {
-	ID     peer.ID `yaml:"id"`
-	Routes []Route `yaml:"routes"`
+	ID     peer.ID `json:"id"`
+	Routes []Route `json:"routes"`
 }
 
 type Route struct {
 	Target     Peer
-	NetworkStr string `yaml:"net"`
+	NetworkStr string `json:"net"`
 	Network    net.IPNet
 }
 
@@ -56,7 +56,7 @@ func Read(path string) (*Config, error) {
 	}
 
 	// Read in config settings from file.
-	err = yaml.Unmarshal(in, &result)
+	err = json.Unmarshal(in, &result)
 	if err != nil {
 		return nil, err
 	}

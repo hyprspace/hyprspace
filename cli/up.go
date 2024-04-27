@@ -72,7 +72,7 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 	// Parse Global Config Flag for Custom Config Path
 	configPath := r.Flags.(*GlobalFlags).Config
 	if configPath == "" {
-		configPath = "/etc/hyprspace/" + args.InterfaceName + ".yaml"
+		configPath = "/etc/hyprspace/" + args.InterfaceName + ".json"
 	}
 
 	// Read in configuration from file.

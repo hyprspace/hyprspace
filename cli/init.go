@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,7 +12,6 @@ import (
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/multiformats/go-multibase"
-	"gopkg.in/yaml.v2"
 )
 
 // Init creates a configuration for a Hyprspace Interface.
@@ -36,7 +36,7 @@ func InitRun(r *cmd.Root, c *cmd.Sub) {
 	// Parse Global Config Flag
 	configPath := r.Flags.(*GlobalFlags).Config
 	if configPath == "" {
-		configPath = "/etc/hyprspace/" + args.InterfaceName + ".yaml"
+		configPath = "/etc/hyprspace/" + args.InterfaceName + ".json"
 	}
 
 	// Create New Libp2p Node
@@ -56,9 +56,10 @@ func InitRun(r *cmd.Root, c *cmd.Sub) {
 			ID:         host.ID(),
 			PrivateKey: multibase.MustNewEncoder(multibase.Base58BTC).Encode(keyBytes),
 		},
+		Peers: make([]config.Peer, 0),
 	}
 
-	out, err := yaml.Marshal(&new)
+	out, err := json.MarshalIndent(&new, "", "  ")
 	checkErr(err)
 
 	err = os.MkdirAll(filepath.Dir(configPath), os.ModePerm)

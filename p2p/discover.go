@@ -31,11 +31,7 @@ func Discover(ctx context.Context, h host.Host, dht *dht.IpfsDHT, peers []config
 			connectedToAny := false
 			for _, p := range peers {
 				if h.Network().Connectedness(p.ID) != network.Connected {
-					addrs, err := dht.FindPeer(ctx, p.ID)
-					if err != nil {
-						continue
-					}
-					_, err = h.Network().DialPeer(ctx, addrs.ID)
+					_, err := h.Network().DialPeer(ctx, p.ID)
 					if err != nil {
 						continue
 					}

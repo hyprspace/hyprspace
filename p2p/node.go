@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/hyprspace/hyprspace/config"
+	drclient "github.com/ipfs/boxo/routing/http/client"
+	"github.com/ipfs/boxo/routing/http/contentrouter"
 	"github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/crypto"
@@ -19,6 +21,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/pnet"
+	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/libp2p/go-libp2p/p2p/discovery/backoff"
 	"github.com/libp2p/go-libp2p/p2p/host/autorelay"
 	routedhost "github.com/libp2p/go-libp2p/p2p/host/routed"
@@ -27,6 +30,22 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
 	ma "github.com/multiformats/go-multiaddr"
 )
+
+var (
+	_ routing.Routing = &httpRoutingWrapper{}
+)
+
+// httpRoutingWrapper is a wrapper needed to construct the routing.Routing interface from
+// http delegated routing.
+type httpRoutingWrapper struct {
+	routing.ContentRouting
+	routing.PeerRouting
+	routing.ValueStore
+}
+
+func (c *httpRoutingWrapper) Bootstrap(ctx context.Context) error {
+	return nil
+}
 
 // Protocol is a descriptor for the Hyprspace P2P Protocol.
 const Protocol = "/hyprspace/0.0.1"
@@ -113,6 +132,7 @@ func CreateNode(ctx context.Context, privateKey crypto.PrivKey, listenAddreses [
 		maybePrivateNet,
 		libp2p.ListenAddrs(listenAddreses...),
 		libp2p.Identity(privateKey),
+		libp2p.UserAgent("hyprspace"),
 		libp2p.DefaultSecurity,
 		libp2p.NATPortMap(),
 		libp2p.DefaultMuxers,
@@ -221,8 +241,35 @@ func CreateNode(ctx context.Context, privateKey crypto.PrivKey, listenAddreses [
 		}),
 	)
 
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.MaxIdleConns = 500
+	transport.MaxIdleConnsPerHost = 100
+	delegateHTTPClient := &http.Client{
+		Transport: &drclient.ResponseBodyLimitedTransport{
+			RoundTripper: transport,
+			LimitBytes:   1 << 20,
+		},
+	}
+	dr, err := drclient.New(
+		"https://p2p.privatevoid.net",
+		drclient.WithHTTPClient(delegateHTTPClient),
+		drclient.WithIdentity(privateKey),
+		drclient.WithUserAgent("hyprspace"),
+	)
+	if err != nil {
+		return node, nil, err
+	}
+
+	cr := contentrouter.NewContentRoutingClient(dr)
+
 	pexr := PeXRouting{basicHost, vpnPeers}
-	pr := ParallelRouting{[]routedhost.Routing{pexr, dhtOut}}
+
+	pr := ParallelRouting{[]routedhost.Routing{pexr, dhtOut, httpRoutingWrapper{
+		ContentRouting: cr,
+		PeerRouting:    cr,
+		ValueStore:     cr,
+	}}}
+
 	node = routedhost.Wrap(basicHost, pr)
 
 	// Setup Hyprspace Stream Handler

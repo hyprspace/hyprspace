@@ -15,6 +15,11 @@ require (
 )
 
 require (
+	github.com/libp2p/go-libp2p-routing-helpers v0.7.0 // indirect
+	github.com/samber/lo v1.36.0 // indirect
+)
+
+require (
 	github.com/benbjohnson/clock v1.3.5 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
@@ -42,7 +47,7 @@ require (
 	github.com/hashicorp/golang-lru v1.0.2 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.5 // indirect
 	github.com/huin/goupnp v1.2.0 // indirect
-	github.com/ipfs/boxo v0.11.0 // indirect
+	github.com/ipfs/boxo v0.13.1
 	github.com/ipfs/go-cid v0.4.1 // indirect
 	github.com/ipfs/go-datastore v0.6.0 // indirect
 	github.com/ipfs/go-ipfs-util v0.0.3 // indirect

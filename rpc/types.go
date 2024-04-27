@@ -26,6 +26,8 @@ type RouteAction string
 
 const (
 	Show RouteAction = "show"
+	Add              = "add"
+	Del              = "del"
 )
 
 type RouteInfo struct {

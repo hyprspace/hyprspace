@@ -49,12 +49,12 @@ type PeerLookup struct {
 }
 
 type RouteTableEntry struct {
-	network net.IPNet
-	Target  Peer
+	Net    net.IPNet
+	Target Peer
 }
 
 func (rte RouteTableEntry) Network() net.IPNet {
-	return rte.network
+	return rte.Net
 }
 
 // Read initializes a config from a file.
@@ -101,8 +101,8 @@ func Read(path string) (*Config, error) {
 			}
 
 			result.PeerLookup.ByRoute.Insert(&RouteTableEntry{
-				network: r.Network,
-				Target:  p,
+				Net:    r.Network,
+				Target: p,
 			})
 
 			fmt.Printf("[+] Route %s via /p2p/%s\n", r.Network.String(), p.ID)

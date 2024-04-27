@@ -35,3 +35,10 @@ func Route(dest net.IPNet) Option {
 		return tun.addRoute(dest)
 	}
 }
+
+// RemoveRoute removes an entry from the system route table
+func RemoveRoute(dest net.IPNet) Option {
+	return func(tun *TUN) error {
+		return tun.delRoute(dest)
+	}
+}

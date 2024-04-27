@@ -77,6 +77,18 @@ func (t *TUN) addRoute(network net.IPNet) error {
 	})
 }
 
+func (t *TUN) delRoute(network net.IPNet) error {
+	link, err := netlink.LinkByName(t.Iface.Name())
+	if err != nil {
+		return err
+	}
+	return netlink.RouteDel(&netlink.Route{
+		LinkIndex: link.Attrs().Index,
+		Dst:       &network,
+		Priority:  3000,
+	})
+}
+
 // Up brings up an interface to allow it to start accepting connections.
 func (t *TUN) Up() error {
 	link, err := netlink.LinkByName(t.Iface.Name())

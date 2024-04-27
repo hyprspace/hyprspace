@@ -11,6 +11,7 @@ import (
 
 	"github.com/hyprspace/hyprspace/config"
 	"github.com/hyprspace/hyprspace/p2p"
+	"github.com/hyprspace/hyprspace/tun"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -21,6 +22,7 @@ import (
 type HyprspaceRPC struct {
 	host   host.Host
 	config config.Config
+	tunDev tun.TUN
 }
 
 func (hsr *HyprspaceRPC) Status(args *Args, reply *StatusReply) error {
@@ -99,6 +101,58 @@ func (hsr *HyprspaceRPC) Route(args *RouteArgs, reply *RouteReply) error {
 		*reply = RouteReply{
 			Routes: routeInfos,
 		}
+	case Add:
+		if len(args.Args) != 2 {
+			return errors.New("expected exactly 2 arguments")
+		}
+		_, network, err := net.ParseCIDR(args.Args[0])
+		if err != nil {
+			return err
+		}
+		peerId, err := peer.Decode(args.Args[1])
+		if err != nil {
+			return err
+		}
+		var target config.Peer
+		var found bool
+		for _, p := range hsr.config.Peers {
+			if p.ID == peerId {
+				target = p
+				found = true
+				break
+			}
+		}
+		if !found {
+			return errors.New("no such peer")
+		}
+		err = hsr.tunDev.Apply(tun.Route(*network))
+		if err != nil {
+			return err
+		}
+
+		hsr.config.PeerLookup.ByRoute.Insert(&config.RouteTableEntry{
+			Net:    *network,
+			Target: target,
+		})
+	case Del:
+		if len(args.Args) != 1 {
+			return errors.New("expected exactly 1 argument")
+		}
+		_, network, err := net.ParseCIDR(args.Args[0])
+		if err != nil {
+			return err
+		}
+
+		err = hsr.tunDev.Apply(tun.RemoveRoute(*network))
+		if err != nil {
+			return err
+		}
+
+		_, err = hsr.config.PeerLookup.ByRoute.Remove(*network)
+		if err != nil {
+			_ = hsr.tunDev.Apply(tun.Route(*network))
+			return err
+		}
 	default:
 		return errors.New("no such action")
 	}
@@ -114,8 +168,8 @@ func (hsr *HyprspaceRPC) Peers(args *Args, reply *PeersReply) error {
 	return nil
 }
 
-func RpcServer(ctx context.Context, ma multiaddr.Multiaddr, host host.Host, config config.Config) {
-	hsr := HyprspaceRPC{host, config}
+func RpcServer(ctx context.Context, ma multiaddr.Multiaddr, host host.Host, config config.Config, tunDev tun.TUN) {
+	hsr := HyprspaceRPC{host, config, tunDev}
 	rpc.Register(&hsr)
 
 	addr, err := ma.ValueForProtocol(multiaddr.P_UNIX)

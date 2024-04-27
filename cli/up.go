@@ -151,7 +151,7 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 	go eventLogger(ctx, host)
 
 	// RPC server
-	go hsrpc.RpcServer(ctx, multiaddr.StringCast(fmt.Sprintf("/unix/run/hyprspace-rpc.%s.sock", cfg.Interface.Name)), host, *cfg)
+	go hsrpc.RpcServer(ctx, multiaddr.StringCast(fmt.Sprintf("/unix/run/hyprspace-rpc.%s.sock", cfg.Interface.Name)), host, *cfg, *tunDev)
 
 	// Magic DNS server
 	go hsdns.MagicDnsServer(ctx, *cfg)

@@ -5,7 +5,7 @@ go 1.18
 require (
 	github.com/DataDrake/cli-ng/v2 v2.0.2
 	github.com/libp2p/go-libp2p v0.23.4
-	github.com/libp2p/go-libp2p-kad-dht v0.18.0
+	github.com/libp2p/go-libp2p-kad-dht v0.20.0
 	github.com/multiformats/go-multiaddr v0.7.0
 	github.com/multiformats/go-multibase v0.1.1
 	github.com/nxadm/tail v1.4.8

@@ -15,6 +15,16 @@
 
       perSystem = { pkgs, ... }: {
         packages.default = pkgs.callPackage ./package.nix {};
+
+        devShells.default = pkgs.mkShell {
+          packages = [
+            pkgs.go
+          ];
+
+          shellHook = ''
+            export GOPATH="$PWD/.data/go";
+          '';
+        };
       };
     };
 }

@@ -6,7 +6,7 @@ in
 
 buildGoModule rec {
   pname = "hyprspace";
-  version = "0.8.5";
+  version = "0.8.6";
 
   src = fs.toSource {
     root = ./.;
@@ -18,7 +18,7 @@ buildGoModule rec {
     ];
   };
 
-  vendorHash = "sha256-VBCgFbJixBh+pKfYGJVapHqWBpUFfvjl1cwOER2Li6Y=";
+  vendorHash = "sha256-xYJB8LxXnic8IoWmbtxrIH8p/TjjNo+kJMNFNvaNPbY=";
 
   ldflags = [ "-s" "-w" "-X github.com/hyprspace/hyprspace/cli.appVersion=${version}" ];
 

@@ -114,7 +114,14 @@ func (hsr *HyprspaceRPC) Route(args *RouteArgs, reply *RouteReply) error {
 		}
 		_, network, err := net.ParseCIDR(args.Args[0])
 		if err != nil {
-			return err
+			addr := net.ParseIP(args.Args[0])
+			if addr == nil {
+				return err
+			}
+			network = &net.IPNet{
+				IP:   addr,
+				Mask: []byte{255, 255, 255, 255},
+			}
 		}
 		target, found := config.FindPeerByCLIRef(hsr.config.Peers, args.Args[1])
 		if !found {

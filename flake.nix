@@ -7,6 +7,7 @@
       url = "github:hercules-ci/flake-parts";
       inputs.nixpkgs-lib.follows = "nixpkgs";
     };
+    process-compose-flake.url = "github:Platonic-Systems/process-compose-flake";
   };
 
   outputs = inputs@{ flake-parts, ... }:

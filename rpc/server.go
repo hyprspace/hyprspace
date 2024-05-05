@@ -60,10 +60,15 @@ func (hsr *HyprspaceRPC) Route(args *RouteArgs, reply *RouteReply) error {
 	switch args.Action {
 	case Show:
 		var routeInfos []RouteInfo
-		allRoutes, err := hsr.config.PeerLookup.ByRoute.CoveredNetworks(*cidranger.AllIPv4)
+		allRoutes4, err := hsr.config.PeerLookup.ByRoute.CoveredNetworks(*cidranger.AllIPv4)
 		if err != nil {
 			return err
 		}
+		allRoutes6, err := hsr.config.PeerLookup.ByRoute.CoveredNetworks(*cidranger.AllIPv6)
+		if err != nil {
+			return err
+		}
+		allRoutes := append(allRoutes4, allRoutes6...)
 		for _, r := range allRoutes {
 			rte := *r.(*config.RouteTableEntry)
 			connected := hsr.host.Network().Connectedness(rte.Target.ID) == network.Connected

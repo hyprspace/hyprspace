@@ -87,11 +87,11 @@ func MagicDnsServer(ctx context.Context, config config.Config, node host.Host) {
 			case dns.TypeA:
 				if qpeer, err := peer.Decode(strings.TrimSuffix(q.Name, "."+domainSuffix(config))); err == nil {
 					if qpeer == node.ID() {
-						m.Answer = append(m.Answer, mkIDRecord(config, node.ID(), config.BuiltinAddr))
+						m.Answer = append(m.Answer, mkIDRecord(config, node.ID(), config.BuiltinAddr4))
 					} else {
 						for _, p := range config.Peers {
 							if p.ID == qpeer {
-								m.Answer = append(m.Answer, mkIDRecord(config, p.ID, p.BuiltinAddr))
+								m.Answer = append(m.Answer, mkIDRecord(config, p.ID, p.BuiltinAddr4))
 								break
 							}
 						}
@@ -106,10 +106,10 @@ func MagicDnsServer(ctx context.Context, config config.Config, node host.Host) {
 
 					if qName == strings.ToLower(hostname) {
 						m.Answer = append(m.Answer, mkAliasRecord(config, qName, node.ID()))
-						m.Answer = append(m.Answer, mkIDRecord(config, node.ID(), config.BuiltinAddr))
+						m.Answer = append(m.Answer, mkIDRecord(config, node.ID(), config.BuiltinAddr4))
 					} else if p, found := config.PeerLookup.ByName[qName]; found {
 						m.Answer = append(m.Answer, mkAliasRecord(config, qName, p.ID))
-						m.Answer = append(m.Answer, mkIDRecord(config, p.ID, p.BuiltinAddr))
+						m.Answer = append(m.Answer, mkIDRecord(config, p.ID, p.BuiltinAddr4))
 					}
 				}
 			}

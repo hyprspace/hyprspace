@@ -25,15 +25,17 @@ type Config struct {
 	PeerLookup             PeerLookup            `json:"-"`
 	EncodedPrivateKey      string                `json:"privateKey"`
 	PrivateKey             crypto.PrivKey        `json:"-"`
-	BuiltinAddr            net.IP                `json:"-"`
+	BuiltinAddr4           net.IP                `json:"-"`
+	BuiltinAddr6           net.IP                `json:"-"`
 }
 
 // Peer defines a peer in the configuration. We might add more to this later.
 type Peer struct {
-	ID          peer.ID `json:"id"`
-	Name        string  `json:"name"`
-	BuiltinAddr net.IP  `json:"-"`
-	Routes      []Route `json:"routes"`
+	ID           peer.ID `json:"id"`
+	Name         string  `json:"name"`
+	BuiltinAddr4 net.IP  `json:"-"`
+	BuiltinAddr6 net.IP  `json:"-"`
+	Routes       []Route `json:"routes"`
 }
 
 type Route struct {
@@ -88,16 +90,14 @@ func Read(path string) (*Config, error) {
 	}
 
 	result.PrivateKey = pk
-	if err != nil {
-		return nil, err
-	}
 
 	peerID, err := peer.IDFromPrivateKey(result.PrivateKey)
 	if err != nil {
 		return nil, err
 	}
 
-	result.BuiltinAddr = mkBuiltinAddr(peerID)
+	result.BuiltinAddr4 = mkBuiltinAddr4(peerID)
+	result.BuiltinAddr6 = mkBuiltinAddr6(peerID)
 
 	for _, addrString := range result.EncodedListenAddresses {
 		addr, err := multiaddr.NewMultiaddr(addrString)
@@ -111,13 +111,22 @@ func Read(path string) (*Config, error) {
 	result.PeerLookup.ByName = make(map[string]Peer)
 
 	for i, p := range result.Peers {
-		p.BuiltinAddr = mkBuiltinAddr(p.ID)
-		p.Routes = append(p.Routes, Route{
-			Network: net.IPNet{
-				IP:   p.BuiltinAddr,
-				Mask: net.IPv4Mask(255, 255, 255, 255),
+		p.BuiltinAddr4 = mkBuiltinAddr4(p.ID)
+		p.BuiltinAddr6 = mkBuiltinAddr6(p.ID)
+		p.Routes = append(p.Routes,
+			Route{
+				Network: net.IPNet{
+					IP:   p.BuiltinAddr4,
+					Mask: net.IPv4Mask(255, 255, 255, 255),
+				},
 			},
-		})
+			Route{
+				Network: net.IPNet{
+					IP:   p.BuiltinAddr6,
+					Mask: net.CIDRMask(128, 128),
+				},
+			},
+		)
 		for _, r := range p.Routes {
 			if r.NetworkStr != "" {
 				_, n, err := net.ParseCIDR(r.NetworkStr)
@@ -143,14 +152,6 @@ func Read(path string) (*Config, error) {
 	// Overwrite path of config to input.
 	result.Path = path
 	return &result, nil
-}
-
-func mkBuiltinAddr(p peer.ID) net.IP {
-	builtinAddr := []byte{100, 64, 1, 2}
-	for i, b := range []byte(p) {
-		builtinAddr[(i%2)+2] ^= b
-	}
-	return net.IP(builtinAddr)
 }
 
 func FindPeer(peers []Peer, needle peer.ID) (*Peer, bool) {

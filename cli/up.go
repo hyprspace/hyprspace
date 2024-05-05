@@ -82,19 +82,27 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 	// Create new TUN device
 	tunDev, err = tun.New(
 		cfg.Interface,
-		tun.Address(cfg.BuiltinAddr.String()+"/32"),
+		tun.Address(cfg.BuiltinAddr4.String()+"/32"),
+		tun.Address(cfg.BuiltinAddr6.String()+"/128"),
 		tun.MTU(1420),
 	)
 	if err != nil {
 		checkErr(err)
 	}
-	allRoutes, err := cfg.PeerLookup.ByRoute.CoveredNetworks(*cidranger.AllIPv4)
+	allRoutes4, err := cfg.PeerLookup.ByRoute.CoveredNetworks(*cidranger.AllIPv4)
+	if err != nil {
+		checkErr(err)
+	}
+	allRoutes6, err := cfg.PeerLookup.ByRoute.CoveredNetworks(*cidranger.AllIPv6)
 	if err != nil {
 		checkErr(err)
 	}
 	var routeOpts []tun.Option
 
-	for _, r := range allRoutes {
+	for _, r := range allRoutes4 {
+		routeOpts = append(routeOpts, tun.Route(r.Network()))
+	}
+	for _, r := range allRoutes6 {
 		routeOpts = append(routeOpts, tun.Route(r.Network()))
 	}
 
@@ -191,8 +199,20 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 			continue
 		}
 
-		dstIP := net.IPv4(packet[16], packet[17], packet[18], packet[19])
-		if cfg.BuiltinAddr.Equal(dstIP) {
+		var dstIP net.IP
+		proto := packet[0] & 0xf0
+
+		if proto == 0x40 {
+			dstIP = net.IP(packet[16:20])
+			if cfg.BuiltinAddr4.Equal(dstIP) {
+				continue
+			}
+		} else if proto == 0x60 {
+			dstIP = net.IP(packet[24:40])
+			if cfg.BuiltinAddr6.Equal(dstIP) {
+				continue
+			}
+		} else {
 			continue
 		}
 		var dst peer.ID

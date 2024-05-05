@@ -42,7 +42,7 @@ func mkAliasRecord(config config.Config, alias string, p peer.ID) *dns.CNAME {
 	}
 }
 
-func mkIDRecord(config config.Config, p peer.ID, addr net.IP) *dns.A {
+func mkIDRecord4(config config.Config, p peer.ID, addr net.IP) *dns.A {
 	cid, _ := peer.ToCid(p).StringOfBase(multibase.Base36)
 	return &dns.A{
 		Hdr: dns.RR_Header{
@@ -52,6 +52,19 @@ func mkIDRecord(config config.Config, p peer.ID, addr net.IP) *dns.A {
 			Ttl:    86400,
 		},
 		A: addr.To4(),
+	}
+}
+
+func mkIDRecord6(config config.Config, p peer.ID, addr net.IP) *dns.AAAA {
+	cid, _ := peer.ToCid(p).StringOfBase(multibase.Base36)
+	return &dns.AAAA{
+		Hdr: dns.RR_Header{
+			Name:   withDomainSuffix(config, cid),
+			Rrtype: dns.TypeAAAA,
+			Class:  dns.ClassINET,
+			Ttl:    86400,
+		},
+		AAAA: addr.To16(),
 	}
 }
 
@@ -85,13 +98,17 @@ func MagicDnsServer(ctx context.Context, config config.Config, node host.Host) {
 		for _, q := range r.Question {
 			switch q.Qtype {
 			case dns.TypeA:
+				fallthrough
+			case dns.TypeAAAA:
 				if qpeer, err := peer.Decode(strings.TrimSuffix(q.Name, "."+domainSuffix(config))); err == nil {
 					if qpeer == node.ID() {
-						m.Answer = append(m.Answer, mkIDRecord(config, node.ID(), config.BuiltinAddr4))
+						m.Answer = append(m.Answer, mkIDRecord4(config, node.ID(), config.BuiltinAddr4))
+						m.Answer = append(m.Answer, mkIDRecord6(config, node.ID(), config.BuiltinAddr6))
 					} else {
 						for _, p := range config.Peers {
 							if p.ID == qpeer {
-								m.Answer = append(m.Answer, mkIDRecord(config, p.ID, p.BuiltinAddr4))
+								m.Answer = append(m.Answer, mkIDRecord4(config, p.ID, p.BuiltinAddr4))
+								m.Answer = append(m.Answer, mkIDRecord6(config, p.ID, p.BuiltinAddr6))
 								break
 							}
 						}
@@ -106,10 +123,12 @@ func MagicDnsServer(ctx context.Context, config config.Config, node host.Host) {
 
 					if qName == strings.ToLower(hostname) {
 						m.Answer = append(m.Answer, mkAliasRecord(config, qName, node.ID()))
-						m.Answer = append(m.Answer, mkIDRecord(config, node.ID(), config.BuiltinAddr4))
+						m.Answer = append(m.Answer, mkIDRecord4(config, node.ID(), config.BuiltinAddr4))
+						m.Answer = append(m.Answer, mkIDRecord6(config, node.ID(), config.BuiltinAddr6))
 					} else if p, found := config.PeerLookup.ByName[qName]; found {
 						m.Answer = append(m.Answer, mkAliasRecord(config, qName, p.ID))
-						m.Answer = append(m.Answer, mkIDRecord(config, p.ID, p.BuiltinAddr4))
+						m.Answer = append(m.Answer, mkIDRecord4(config, p.ID, p.BuiltinAddr4))
+						m.Answer = append(m.Answer, mkIDRecord6(config, p.ID, p.BuiltinAddr6))
 					}
 				}
 			}

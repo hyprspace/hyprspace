@@ -47,6 +47,7 @@ type Route struct {
 type PeerLookup struct {
 	ByRoute cidranger.Ranger
 	ByName  map[string]Peer
+	ByNetID map[[4]byte]Peer
 }
 
 type RouteTableEntry struct {
@@ -109,6 +110,7 @@ func Read(path string) (*Config, error) {
 
 	result.PeerLookup.ByRoute = cidranger.NewPCTrieRanger()
 	result.PeerLookup.ByName = make(map[string]Peer)
+	result.PeerLookup.ByNetID = make(map[[4]byte]Peer)
 
 	for i, p := range result.Peers {
 		p.BuiltinAddr4 = mkBuiltinAddr4(p.ID)
@@ -146,6 +148,7 @@ func Read(path string) (*Config, error) {
 		if p.Name != "" {
 			result.PeerLookup.ByName[strings.ToLower(p.Name)] = p
 		}
+		result.PeerLookup.ByNetID[[4]byte(p.BuiltinAddr6[12:14])] = p
 		result.Peers[i] = p
 	}
 

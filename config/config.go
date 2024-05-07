@@ -148,7 +148,7 @@ func Read(path string) (*Config, error) {
 		if p.Name != "" {
 			result.PeerLookup.ByName[strings.ToLower(p.Name)] = p
 		}
-		result.PeerLookup.ByNetID[[4]byte(p.BuiltinAddr6[12:14])] = p
+		result.PeerLookup.ByNetID[[4]byte(p.BuiltinAddr6[12:16])] = p
 		result.Peers[i] = p
 	}
 

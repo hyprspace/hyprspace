@@ -167,7 +167,7 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 		fmt.Printf("[+] Listening for metrics scrape requests on http://%s/metrics\n", metricsTuple)
 	}
 
-	serviceNet := svc.NewServiceNetwork(host.ID(), tunDev)
+	serviceNet := svc.NewServiceNetwork(host, cfg, tunDev)
 
 	// Write lock to filesystem to indicate an existing running daemon.
 	err = os.WriteFile(lockPath, []byte(fmt.Sprint(os.Getpid())), os.ModePerm)

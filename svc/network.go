@@ -5,27 +5,31 @@ import (
 	"net"
 	"net/netip"
 
+	"github.com/hyprspace/hyprspace/config"
 	"github.com/hyprspace/hyprspace/netstack"
 	hstun "github.com/hyprspace/hyprspace/tun"
-	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/host"
 	"golang.zx2c4.com/wireguard/tun"
 	"gvisor.dev/gvisor/pkg/tcpip"
 	"gvisor.dev/gvisor/pkg/tcpip/network/ipv6"
 )
 
+const Protocol = "/hyprspace/service/0.0.1"
+
 type ServiceNetwork struct {
-	self         peer.ID
+	host         host.Host
+	config       *config.Config
+	self         [4]byte
 	NetworkRange net.IPNet
 	Tun          *tun.Device
 	netx         *netstack.Net
 	activeAddrs  map[[16]byte]struct{}
 	activePorts  map[[16]byte]map[uint16]struct{}
-	listeners    map[[6]byte]func(net.Listener) error
+	listeners    map[[2]byte]func(net.Listener) error
 }
 
-func (sn *ServiceNetwork) Register(addr net.IP, serveFunc func(net.Listener) error) {
-	var svcId [6]byte = [6]byte(addr[10:16])
-	sn.listeners[svcId] = serveFunc
+func (sn *ServiceNetwork) Register(serviceName string, serveFunc func(net.Listener) error) {
+	sn.listeners[config.MkServiceID(serviceName)] = serveFunc
 }
 
 func (sn *ServiceNetwork) EnsureListener(addr [16]byte, port uint16) bool {
@@ -36,12 +40,19 @@ func (sn *ServiceNetwork) EnsureListener(addr [16]byte, port uint16) bool {
 		}
 		registerAddr = false
 	}
+	netId := [4]byte(addr[10:14])
+	svcId := [2]byte(addr[14:16])
 	var serveFunc func(net.Listener) error
-	if s, ok := sn.listeners[[6]byte(addr[10:16])]; ok {
-		serveFunc = s
-	} else {
-		fmt.Printf("[!] [svc] Unknown service: %x\n", addr[10:16])
-		return false
+	if netId == sn.self {
+		// local service
+		if s, ok := sn.listeners[svcId]; ok {
+			serveFunc = s
+		} else {
+			fmt.Printf("[!] [svc] Unknown service: %x\n", addr[10:16])
+			return false
+		}
+	} else if p, ok := sn.config.PeerLookup.ByNetID[netId]; ok {
+		serveFunc = RemoteServiceProxy(sn.host, p.ID, svcId)
 	}
 	tcpAddr := net.TCPAddr{
 		IP:   net.IP(addr[:]),
@@ -68,7 +79,7 @@ func (sn *ServiceNetwork) EnsureListener(addr [16]byte, port uint16) bool {
 	return true
 }
 
-func NewServiceNetwork(p peer.ID, tunDev *hstun.TUN) ServiceNetwork {
+func NewServiceNetwork(host host.Host, cfg *config.Config, tunDev *hstun.TUN) ServiceNetwork {
 	tun, netx, err := netstack.CreateNetTUN(
 		[]netip.Addr{
 			netip.AddrFrom16([16]byte([]byte("\xfd\x00hyprspinternal"))),
@@ -100,8 +111,11 @@ func NewServiceNetwork(p peer.ID, tunDev *hstun.TUN) ServiceNetwork {
 	}()
 
 	fmt.Println("[+] Service Network ready")
+
 	return ServiceNetwork{
-		self: p,
+		host:   host,
+		config: cfg,
+		self:   [4]byte(cfg.BuiltinAddr6[12:16]),
 		NetworkRange: net.IPNet{
 			IP:   []byte("\xfd\x00hyprspsv\x00\x00\x00\x00\x00\x00"),
 			Mask: net.CIDRMask(80, 128),
@@ -110,6 +124,6 @@ func NewServiceNetwork(p peer.ID, tunDev *hstun.TUN) ServiceNetwork {
 		netx:        netx,
 		activeAddrs: make(map[[16]byte]struct{}),
 		activePorts: make(map[[16]byte]map[uint16]struct{}),
-		listeners:   make(map[[6]byte]func(net.Listener) error),
+		listeners:   make(map[[2]byte]func(net.Listener) error),
 	}
 }

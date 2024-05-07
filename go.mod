@@ -1,6 +1,6 @@
 module github.com/hyprspace/hyprspace
 
-go 1.21
+go 1.22.0
 
 toolchain go1.22.2
 
@@ -13,14 +13,19 @@ require (
 	github.com/multiformats/go-multibase v0.2.0
 	github.com/prometheus/client_golang v1.18.0
 	github.com/songgao/water v0.0.0-20200317203138-2b4b6d7c09d8
-	github.com/vishvananda/netlink v1.1.0
+	github.com/vishvananda/netlink v1.1.1-0.20211118161826-650dca95af54
+	golang.zx2c4.com/wireguard v0.0.0-20231211153847-12269c276173
 )
 
 require (
 	github.com/Jorropo/jsync v1.0.1 // indirect
+	github.com/google/btree v1.1.2 // indirect
 	github.com/libp2p/go-libp2p-routing-helpers v0.7.2 // indirect
 	github.com/samber/lo v1.36.0 // indirect
 	go.uber.org/mock v0.4.0 // indirect
+	golang.org/x/time v0.5.0 // indirect
+	golang.zx2c4.com/wintun v0.0.0-20230126152724-0fa3db229ce2 // indirect
+	gvisor.dev/gvisor v0.0.0-20230927004350-cbd86285d259 // indirect
 )
 
 require (

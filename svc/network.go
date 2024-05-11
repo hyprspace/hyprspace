@@ -114,7 +114,7 @@ func NewServiceNetwork(host host.Host, cfg *config.Config, tunDev *hstun.TUN) Se
 
 	fmt.Println("[+] Service Network ready")
 
-	return ServiceNetwork{
+	sn := ServiceNetwork{
 		host:   host,
 		config: cfg,
 		self:   [4]byte(cfg.BuiltinAddr6[12:16]),
@@ -128,4 +128,7 @@ func NewServiceNetwork(host host.Host, cfg *config.Config, tunDev *hstun.TUN) Se
 		activePorts: make(map[[16]byte]map[uint16]struct{}),
 		listeners:   make(map[[2]byte]Proxy),
 	}
+
+	host.SetStreamHandler(Protocol, sn.streamHandler())
+	return sn
 }

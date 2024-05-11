@@ -169,6 +169,15 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 
 	serviceNet := svc.NewServiceNetwork(host, cfg, tunDev)
 
+	for name, addr := range cfg.Services {
+		proxy, err := svc.ProxyTo(addr)
+		checkErr(err)
+		serviceNet.Register(
+			name,
+			proxy,
+		)
+	}
+
 	// Write lock to filesystem to indicate an existing running daemon.
 	err = os.WriteFile(lockPath, []byte(fmt.Sprint(os.Getpid())), os.ModePerm)
 	checkErr(err)

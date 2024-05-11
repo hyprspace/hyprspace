@@ -13,7 +13,8 @@ import (
 )
 
 type Proxy struct {
-	Handle func(net.Conn)
+	Handle      func(net.Conn)
+	Description string
 }
 
 func (p Proxy) ServeFunc() func(net.Listener) error {
@@ -98,6 +99,7 @@ func RemoteServiceProxy(host host.Host, p peer.ID, svcId [2]byte) Proxy {
 			}
 			pipe(conn, stream)
 		},
+		Description: fmt.Sprintf("RemoteServiceProxy to service [%x] on %s", svcId, p),
 	}
 }
 
@@ -113,5 +115,6 @@ func TCPServiceProxy(tcpAddr net.TCPAddr) Proxy {
 			defer stream.Close()
 			pipe(conn, stream)
 		},
+		Description: fmt.Sprintf("TCPServiceProxy to %s", tcpAddr.AddrPort()),
 	}
 }

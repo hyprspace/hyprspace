@@ -31,7 +31,7 @@ type ServiceNetwork struct {
 func (sn *ServiceNetwork) Register(serviceName string, proxy Proxy) {
 	svcId := config.MkServiceID(serviceName)
 	sn.listeners[svcId] = proxy
-	fmt.Printf("[-] Registered service \"%s\" [%x]\n", serviceName, svcId)
+	fmt.Printf("[-] Registered service \"%s\" [%x]: %s\n", serviceName, svcId, proxy.Description)
 }
 
 func (sn *ServiceNetwork) EnsureListener(addr [16]byte, port uint16) bool {

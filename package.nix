@@ -18,6 +18,8 @@ buildGoModule rec {
     ];
   };
 
+  CGO_ENABLED = "0";
+
   vendorHash = "sha256-xYJB8LxXnic8IoWmbtxrIH8p/TjjNo+kJMNFNvaNPbY=";
 
   ldflags = [ "-s" "-w" "-X github.com/hyprspace/hyprspace/cli.appVersion=${version}" ];

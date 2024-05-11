@@ -25,11 +25,13 @@ type ServiceNetwork struct {
 	netx         *netstack.Net
 	activeAddrs  map[[16]byte]struct{}
 	activePorts  map[[16]byte]map[uint16]struct{}
-	listeners    map[[2]byte]func(net.Listener) error
+	listeners    map[[2]byte]Proxy
 }
 
-func (sn *ServiceNetwork) Register(serviceName string, serveFunc func(net.Listener) error) {
-	sn.listeners[config.MkServiceID(serviceName)] = serveFunc
+func (sn *ServiceNetwork) Register(serviceName string, proxy Proxy) {
+	svcId := config.MkServiceID(serviceName)
+	sn.listeners[svcId] = proxy
+	fmt.Printf("[-] Registered service \"%s\" [%x]\n", serviceName, svcId)
 }
 
 func (sn *ServiceNetwork) EnsureListener(addr [16]byte, port uint16) bool {
@@ -42,17 +44,17 @@ func (sn *ServiceNetwork) EnsureListener(addr [16]byte, port uint16) bool {
 	}
 	netId := [4]byte(addr[10:14])
 	svcId := [2]byte(addr[14:16])
-	var serveFunc func(net.Listener) error
+	var proxy Proxy
 	if netId == sn.self {
 		// local service
 		if s, ok := sn.listeners[svcId]; ok {
-			serveFunc = s
+			proxy = s
 		} else {
 			fmt.Printf("[!] [svc] Unknown service: %x\n", addr[10:16])
 			return false
 		}
 	} else if p, ok := sn.config.PeerLookup.ByNetID[netId]; ok {
-		serveFunc = RemoteServiceProxy(sn.host, p.ID, svcId)
+		proxy = RemoteServiceProxy(sn.host, p.ID, svcId)
 	}
 	tcpAddr := net.TCPAddr{
 		IP:   net.IP(addr[:]),
@@ -74,7 +76,7 @@ func (sn *ServiceNetwork) EnsureListener(addr [16]byte, port uint16) bool {
 		panic(err)
 	}
 
-	go serveFunc(tcpL)
+	go proxy.ServeFunc()(tcpL)
 	fmt.Printf("[-] [svc] Listening on /ip6/%s/tcp/%d\n", tcpAddr.IP, tcpAddr.Port)
 	return true
 }
@@ -124,6 +126,6 @@ func NewServiceNetwork(host host.Host, cfg *config.Config, tunDev *hstun.TUN) Se
 		netx:        netx,
 		activeAddrs: make(map[[16]byte]struct{}),
 		activePorts: make(map[[16]byte]map[uint16]struct{}),
-		listeners:   make(map[[2]byte]func(net.Listener) error),
+		listeners:   make(map[[2]byte]Proxy),
 	}
 }

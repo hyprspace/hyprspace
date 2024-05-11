@@ -61,3 +61,18 @@ func RemoteServiceProxy(host host.Host, p peer.ID, svcId [2]byte) Proxy {
 		},
 	}
 }
+
+func TCPServiceProxy(tcpAddr net.TCPAddr) Proxy {
+	return Proxy{
+		Handle: func(conn net.Conn) {
+			stream, err := net.DialTCP("tcp", nil, &tcpAddr)
+			defer conn.Close()
+			if err != nil {
+				fmt.Printf("[!] [svc] %s\n", err)
+				return
+			}
+			defer stream.Close()
+			pipe(conn, stream)
+		},
+	}
+}

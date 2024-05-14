@@ -6,7 +6,7 @@ in
 
 buildGoModule rec {
   pname = "hyprspace";
-  version = "0.8.6";
+  version = "0.9.0";
 
   src = fs.toSource {
     root = ./.;

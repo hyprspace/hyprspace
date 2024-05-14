@@ -24,9 +24,14 @@
       ];
 
       perSystem =
-        { pkgs, ... }:
+        { config, pkgs, ... }:
         {
-          packages.default = pkgs.callPackage ./package.nix { };
+          packages = {
+            default = pkgs.callPackage ./package.nix {};
+            docs = pkgs.callPackage ./docs/package.nix {
+              hyprspace = config.packages.default;
+            };
+          };
 
           devShells.default = pkgs.mkShell {
             packages = [ pkgs.go ];

@@ -17,16 +17,18 @@ import (
 
 // Config is the main Configuration Struct for Hyprspace.
 type Config struct {
-	Path                   string                `json:"-"`
-	Interface              string                `json:"-"`
-	EncodedListenAddresses []string              `json:"listenAddresses"`
-	ListenAddresses        []multiaddr.Multiaddr `json:"-"`
-	Peers                  []Peer                `json:"peers"`
-	PeerLookup             PeerLookup            `json:"-"`
-	EncodedPrivateKey      string                `json:"privateKey"`
-	PrivateKey             crypto.PrivKey        `json:"-"`
-	BuiltinAddr4           net.IP                `json:"-"`
-	BuiltinAddr6           net.IP                `json:"-"`
+	Path                   string                         `json:"-"`
+	Interface              string                         `json:"-"`
+	EncodedListenAddresses []string                       `json:"listenAddresses"`
+	ListenAddresses        []multiaddr.Multiaddr          `json:"-"`
+	Peers                  []Peer                         `json:"peers"`
+	PeerLookup             PeerLookup                     `json:"-"`
+	EncodedPrivateKey      string                         `json:"privateKey"`
+	PrivateKey             crypto.PrivKey                 `json:"-"`
+	BuiltinAddr4           net.IP                         `json:"-"`
+	BuiltinAddr6           net.IP                         `json:"-"`
+	EncodedServices        map[string]string              `json:"services,omitempty"`
+	Services               map[string]multiaddr.Multiaddr `json:"-"`
 }
 
 // Peer defines a peer in the configuration. We might add more to this later.
@@ -47,6 +49,7 @@ type Route struct {
 type PeerLookup struct {
 	ByRoute cidranger.Ranger
 	ByName  map[string]Peer
+	ByNetID map[[4]byte]Peer
 }
 
 type RouteTableEntry struct {
@@ -109,6 +112,7 @@ func Read(path string) (*Config, error) {
 
 	result.PeerLookup.ByRoute = cidranger.NewPCTrieRanger()
 	result.PeerLookup.ByName = make(map[string]Peer)
+	result.PeerLookup.ByNetID = make(map[[4]byte]Peer)
 
 	for i, p := range result.Peers {
 		p.BuiltinAddr4 = mkBuiltinAddr4(p.ID)
@@ -146,7 +150,17 @@ func Read(path string) (*Config, error) {
 		if p.Name != "" {
 			result.PeerLookup.ByName[strings.ToLower(p.Name)] = p
 		}
+		result.PeerLookup.ByNetID[[4]byte(p.BuiltinAddr6[12:16])] = p
 		result.Peers[i] = p
+	}
+
+	result.Services = make(map[string]multiaddr.Multiaddr)
+	for name, addrString := range result.EncodedServices {
+		addr, err := multiaddr.NewMultiaddr(addrString)
+		if err != nil {
+			return nil, err
+		}
+		result.Services[name] = addr
 	}
 
 	// Overwrite path of config to input.

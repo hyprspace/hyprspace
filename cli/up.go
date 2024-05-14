@@ -20,6 +20,7 @@ import (
 	hsdns "github.com/hyprspace/hyprspace/dns"
 	"github.com/hyprspace/hyprspace/p2p"
 	hsrpc "github.com/hyprspace/hyprspace/rpc"
+	"github.com/hyprspace/hyprspace/svc"
 	"github.com/hyprspace/hyprspace/tun"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/event"
@@ -166,6 +167,17 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 		fmt.Printf("[+] Listening for metrics scrape requests on http://%s/metrics\n", metricsTuple)
 	}
 
+	serviceNet := svc.NewServiceNetwork(host, cfg, tunDev)
+
+	for name, addr := range cfg.Services {
+		proxy, err := svc.ProxyTo(addr)
+		checkErr(err)
+		serviceNet.Register(
+			name,
+			proxy,
+		)
+	}
+
 	// Write lock to filesystem to indicate an existing running daemon.
 	err = os.WriteFile(lockPath, []byte(fmt.Sprint(os.Getpid())), os.ModePerm)
 	checkErr(err)
@@ -176,6 +188,8 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 		checkErr(errors.New("unable to bring up tun device"))
 	}
 	checkErr(tunDev.Apply(routeOpts...))
+
+	checkErr(tunDev.Apply(tun.Route(serviceNet.NetworkRange)))
 
 	fmt.Println("[+] Network setup complete")
 
@@ -210,6 +224,18 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 		} else if proto == 0x60 {
 			dstIP = net.IP(packet[24:40])
 			if cfg.BuiltinAddr6.Equal(dstIP) {
+				continue
+			} else if serviceNet.NetworkRange.Contains(dstIP) {
+				// Are you TCP because your protocol is 6, or is your protocol 6 because you are TCP?
+				if packet[6] == 0x06 {
+					port := uint16(packet[42])*256 + uint16(packet[43])
+					if serviceNet.EnsureListener([16]byte(packet[24:40]), port) {
+						count, err := (*serviceNet.Tun).Write([][]byte{packet}, 0)
+						if count == 0 {
+							fmt.Printf("[!] To service network: %s\n", err)
+						}
+					}
+				}
 				continue
 			}
 		} else {

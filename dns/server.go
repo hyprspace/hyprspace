@@ -29,16 +29,25 @@ func withDomainSuffix(config config.Config, str string) string {
 	return fmt.Sprintf("%s.%s", str, domainSuffix(config))
 }
 
-func mkAliasRecord(config config.Config, alias string, p peer.ID) *dns.CNAME {
+func mkAliasRecord(config config.Config, alias string, serviceName string, p peer.ID) *dns.CNAME {
 	cid, _ := peer.ToCid(p).StringOfBase(multibase.Base36)
+	var aliasWithSvc string
+	var cidWithSvc string
+	if serviceName == "" {
+		aliasWithSvc = alias
+		cidWithSvc = cid
+	} else {
+		aliasWithSvc = serviceName + "." + alias
+		cidWithSvc = serviceName + "." + cid
+	}
 	return &dns.CNAME{
 		Hdr: dns.RR_Header{
-			Name:   withDomainSuffix(config, alias),
+			Name:   withDomainSuffix(config, aliasWithSvc),
 			Rrtype: dns.TypeCNAME,
 			Class:  dns.ClassINET,
 			Ttl:    0,
 		},
-		Target: withDomainSuffix(config, cid),
+		Target: withDomainSuffix(config, cidWithSvc),
 	}
 }
 
@@ -55,16 +64,25 @@ func mkIDRecord4(config config.Config, p peer.ID, addr net.IP) *dns.A {
 	}
 }
 
-func mkIDRecord6(config config.Config, p peer.ID, addr net.IP) *dns.AAAA {
+func mkIDRecord6(cfg config.Config, p peer.ID, serviceName string, addr net.IP) *dns.AAAA {
 	cid, _ := peer.ToCid(p).StringOfBase(multibase.Base36)
+	var addrWithSvc net.IP
+	var cidWithSvc string
+	if serviceName == "" {
+		addrWithSvc = addr
+		cidWithSvc = cid
+	} else {
+		addrWithSvc = config.MkServiceAddr6(p, serviceName)
+		cidWithSvc = serviceName + "." + cid
+	}
 	return &dns.AAAA{
 		Hdr: dns.RR_Header{
-			Name:   withDomainSuffix(config, cid),
+			Name:   withDomainSuffix(cfg, cidWithSvc),
 			Rrtype: dns.TypeAAAA,
 			Class:  dns.ClassINET,
 			Ttl:    86400,
 		},
-		AAAA: addr.To16(),
+		AAAA: addrWithSvc.To16(),
 	}
 }
 
@@ -100,15 +118,31 @@ func MagicDnsServer(ctx context.Context, config config.Config, node host.Host) {
 			case dns.TypeA:
 				fallthrough
 			case dns.TypeAAAA:
-				if qpeer, err := peer.Decode(strings.TrimSuffix(q.Name, "."+domainSuffix(config))); err == nil {
+				nameParts := strings.Split(strings.TrimSuffix(q.Name, "."+domainSuffix(config)), ".")
+				var qNodeName string
+				var qServiceName string
+				if len(nameParts) == 2 {
+					qServiceName = nameParts[0]
+					qNodeName = nameParts[1]
+				} else if len(nameParts) == 1 {
+					qNodeName = nameParts[0]
+				} else {
+					return
+				}
+				isService := qServiceName != ""
+				if qpeer, err := peer.Decode(qNodeName); err == nil {
 					if qpeer == node.ID() {
-						m.Answer = append(m.Answer, mkIDRecord4(config, node.ID(), config.BuiltinAddr4))
-						m.Answer = append(m.Answer, mkIDRecord6(config, node.ID(), config.BuiltinAddr6))
+						if !isService {
+							m.Answer = append(m.Answer, mkIDRecord4(config, node.ID(), config.BuiltinAddr4))
+						}
+						m.Answer = append(m.Answer, mkIDRecord6(config, node.ID(), qServiceName, config.BuiltinAddr6))
 					} else {
 						for _, p := range config.Peers {
 							if p.ID == qpeer {
-								m.Answer = append(m.Answer, mkIDRecord4(config, p.ID, p.BuiltinAddr4))
-								m.Answer = append(m.Answer, mkIDRecord6(config, p.ID, p.BuiltinAddr6))
+								if !isService {
+									m.Answer = append(m.Answer, mkIDRecord4(config, p.ID, p.BuiltinAddr4))
+								}
+								m.Answer = append(m.Answer, mkIDRecord6(config, p.ID, qServiceName, p.BuiltinAddr6))
 								break
 							}
 						}
@@ -119,16 +153,20 @@ func MagicDnsServer(ctx context.Context, config config.Config, node host.Host) {
 						fmt.Println("[!] [dns] " + err.Error())
 					}
 
-					qName := strings.ToLower(strings.TrimSuffix(q.Name, "."+domainSuffix(config)))
+					qName := strings.ToLower(qNodeName)
 
 					if qName == strings.ToLower(hostname) {
-						m.Answer = append(m.Answer, mkAliasRecord(config, qName, node.ID()))
-						m.Answer = append(m.Answer, mkIDRecord4(config, node.ID(), config.BuiltinAddr4))
-						m.Answer = append(m.Answer, mkIDRecord6(config, node.ID(), config.BuiltinAddr6))
+						m.Answer = append(m.Answer, mkAliasRecord(config, qName, qServiceName, node.ID()))
+						if !isService {
+							m.Answer = append(m.Answer, mkIDRecord4(config, node.ID(), config.BuiltinAddr4))
+						}
+						m.Answer = append(m.Answer, mkIDRecord6(config, node.ID(), qServiceName, config.BuiltinAddr6))
 					} else if p, found := config.PeerLookup.ByName[qName]; found {
-						m.Answer = append(m.Answer, mkAliasRecord(config, qName, p.ID))
-						m.Answer = append(m.Answer, mkIDRecord4(config, p.ID, p.BuiltinAddr4))
-						m.Answer = append(m.Answer, mkIDRecord6(config, p.ID, p.BuiltinAddr6))
+						m.Answer = append(m.Answer, mkAliasRecord(config, qName, qServiceName, p.ID))
+						if !isService {
+							m.Answer = append(m.Answer, mkIDRecord4(config, p.ID, p.BuiltinAddr4))
+						}
+						m.Answer = append(m.Answer, mkIDRecord6(config, p.ID, qServiceName, p.BuiltinAddr6))
 					}
 				}
 			}

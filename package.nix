@@ -20,7 +20,7 @@ buildGoModule rec {
 
   CGO_ENABLED = "0";
 
-  vendorHash = "sha256-xYJB8LxXnic8IoWmbtxrIH8p/TjjNo+kJMNFNvaNPbY=";
+  vendorHash = "sha256-aDh2f0LCcBR31mwXVusyItqoneQkJi1fuckY/V7Qxy8=";
 
   ldflags = [ "-s" "-w" "-X github.com/hyprspace/hyprspace/cli.appVersion=${version}" ];
 

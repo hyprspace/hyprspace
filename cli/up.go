@@ -178,6 +178,22 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 		)
 	}
 
+	var svcNetIds [][4]byte
+	for _, p := range cfg.Peers {
+		svcNetIds = append(svcNetIds, config.MkNetID(p.ID))
+	}
+	svcNetIds = append(svcNetIds, config.MkNetID(host.ID()))
+	for _, netId := range svcNetIds {
+		addr := make([]byte, 16)
+		copy(addr, serviceNet.NetworkRange.IP)
+		copy(addr[10:], netId[:])
+		mask1, mask0 := serviceNet.NetworkRange.Mask.Size()
+		routeOpts = append(routeOpts, tun.Route(net.IPNet{
+			IP:   addr,
+			Mask: net.CIDRMask(mask1+32, mask0),
+		}))
+	}
+
 	// Write lock to filesystem to indicate an existing running daemon.
 	err = os.WriteFile(lockPath, []byte(fmt.Sprint(os.Getpid())), os.ModePerm)
 	checkErr(err)
@@ -188,8 +204,6 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 		checkErr(errors.New("unable to bring up tun device"))
 	}
 	checkErr(tunDev.Apply(routeOpts...))
-
-	checkErr(tunDev.Apply(tun.Route(serviceNet.NetworkRange)))
 
 	fmt.Println("[+] Network setup complete")
 

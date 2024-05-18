@@ -119,7 +119,10 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 		cfg.ListenAddresses,
 		streamHandler,
 		p2p.NewClosedCircuitRelayFilter(cfg.Peers),
-		p2p.NewRecursionGater(cfg),
+		p2p.NewMultiGater(
+			p2p.NewRecursionGater(cfg),
+			p2p.NewAutoFilterGater(),
+		),
 		cfg.Peers,
 	)
 	checkErr(err)

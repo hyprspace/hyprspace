@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/hyprspace/hyprspace/config"
+	"github.com/libp2p/go-libp2p/core/connmgr"
 	"github.com/libp2p/go-libp2p/core/control"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -52,7 +53,7 @@ type RecursionGater struct {
 	ifindex int
 }
 
-func NewRecursionGater(config *config.Config) RecursionGater {
+func NewRecursionGater(config *config.Config) connmgr.ConnectionGater {
 	link, err := netlink.LinkByName(config.Interface)
 	if err != nil {
 		panic(err)

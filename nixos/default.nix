@@ -13,6 +13,8 @@ let
   }));
 
   maybeMetricsPort = mkIf opt.metricsPort.isDefined (toString opt.metricsPort);
+
+  listenPorts = map (builtins.match "/.*/(tcp|udp)/([0-9]*).*") cfg.settings.listenAddresses;
 in
 
 {
@@ -72,5 +74,14 @@ in
 
       environment.HYPRSPACE_METRICS_PORT = maybeMetricsPort;
     };
+
+    networking.firewall = mkMerge (map (x: let
+      port = toInt (last x);
+      proto = head x;
+    in if proto == "tcp" then {
+      allowedTCPPorts = [ port ];
+    } else if proto == "udp" then {
+      allowedUDPPorts = [ port ];
+    } else throw "unsupported protocol: ${proto}") listenPorts);
   };
 }

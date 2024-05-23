@@ -70,6 +70,8 @@ in
         Restart = "on-failure";
         RestartSec = "5s";
         ExecStart = "${cfg.package}/bin/hyprspace up -c ${if usePrivateKeyFromFile then runConfig else configFile} -i ${escapeShellArg cfg.interface}";
+        ExecStopPost = "${pkgs.coreutils}/bin/rm -f ${escapeShellArg "/run/hyprspace-rpc.${cfg.interface}.sock"}";
+        ExecReload = "${pkgs.coreutils}/bin/kill -USR1 $MAINPID";
       };
 
       environment.HYPRSPACE_METRICS_PORT = maybeMetricsPort;

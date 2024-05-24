@@ -291,9 +291,7 @@ func CreateNode(ctx context.Context, privateKey crypto.PrivKey, listenAddreses [
 		for {
 			for _, p := range node.Network().Peers() {
 				pi := node.Network().Peerstore().PeerInfo(p)
-				if acl.AllowReserve(p, node.Addrs()[0]) {
-					peerChan <- pi
-				}
+				peerChan <- pi
 			}
 			time.Sleep(delay.Delay())
 		}

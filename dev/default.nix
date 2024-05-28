@@ -1,7 +1,5 @@
 {
-  imports = [
-    ./generate-schemas.nix
-  ];
+  imports = [ ./generate-schemas.nix ./formatting.nix ];
 
   perSystem = { config, pkgs, ... }: {
     devShells.default = pkgs.mkShell {

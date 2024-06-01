@@ -4,6 +4,8 @@
 
 A Lightweight VPN Built on top of IPFS & Libp2p for Truly Distributed Networks. 
 
+[Documentation](https://docs.hyprspace.privatevoid.net/)
+
 https://user-images.githubusercontent.com/19558067/152407636-a5f4ae1f-9493-4346-bf73-0de109928415.mp4
 
 

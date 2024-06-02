@@ -1,6 +1,7 @@
-{ lib
-, buildGoModule
-, fetchFromGitHub
+{
+  lib,
+  buildGoModule,
+  fetchFromGitHub,
 }:
 
 buildGoModule rec {
@@ -24,7 +25,7 @@ buildGoModule rec {
     "-X=main.buildTime=1970-01-01T00:00:00Z"
   ];
 
-  subPackages = ["."];
+  subPackages = [ "." ];
   meta = with lib; {
     description = "A tool to generate Go data types from JSON Schema definitions";
     homepage = "https://github.com/omissis/go-jsonschema";

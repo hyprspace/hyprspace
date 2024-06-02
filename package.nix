@@ -1,4 +1,8 @@
-{ lib, buildGoModule, generateSchemasProgram }:
+{
+  lib,
+  buildGoModule,
+  generateSchemasProgram,
+}:
 let
   inherit (lib.fileset) toSource unions fileFilter;
   pname = "hyprspace";

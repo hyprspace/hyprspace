@@ -1,4 +1,10 @@
-{ config, lib, options, pkgs, ... }:
+{
+  config,
+  lib,
+  options,
+  pkgs,
+  ...
+}:
 with lib;
 
 let
@@ -8,9 +14,14 @@ let
   usePrivateKeyFromFile = options.services.hyprspace.privateKeyFile.isDefined;
   privKeyMarker = "@HYPRSPACEPRIVATEKEY@";
   runConfig = "/run/hyprspace.json";
-  configFile = pkgs.writeText "hyprspace-config.json" (builtins.toJSON (cfg.settings // {
-    privateKey = if usePrivateKeyFromFile then privKeyMarker else cfg.settings.privateKey;
-  }));
+  configFile = pkgs.writeText "hyprspace-config.json" (
+    builtins.toJSON (
+      cfg.settings
+      // {
+        privateKey = if usePrivateKeyFromFile then privKeyMarker else cfg.settings.privateKey;
+      }
+    )
+  );
 
   maybeMetricsPort = mkIf opt.metricsPort.isDefined (toString opt.metricsPort);
 
@@ -35,7 +46,7 @@ in
     settings = mkOption {
       type = types.submodule ./settings.nix;
       description = "Hyprspace configuration options.";
-      default = {};
+      default = { };
     };
 
     privateKeyFile = mkOption {
@@ -69,7 +80,9 @@ in
         Group = "wheel";
         Restart = "on-failure";
         RestartSec = "5s";
-        ExecStart = "${cfg.package}/bin/hyprspace up -c ${if usePrivateKeyFromFile then runConfig else configFile} -i ${escapeShellArg cfg.interface}";
+        ExecStart = "${cfg.package}/bin/hyprspace up -c ${
+          if usePrivateKeyFromFile then runConfig else configFile
+        } -i ${escapeShellArg cfg.interface}";
         ExecStopPost = "${pkgs.coreutils}/bin/rm -f ${escapeShellArg "/run/hyprspace-rpc.${cfg.interface}.sock"}";
         ExecReload = "${pkgs.coreutils}/bin/kill -USR1 $MAINPID";
       };
@@ -77,14 +90,21 @@ in
       environment.HYPRSPACE_METRICS_PORT = maybeMetricsPort;
     };
 
-    networking.firewall = mkMerge (map (x: let
-      port = toInt (last x);
-      proto = head x;
-    in if proto == "tcp" then {
-      allowedTCPPorts = [ port ];
-    } else if proto == "udp" then {
-      allowedUDPPorts = [ port ];
-    } else throw "unsupported protocol: ${proto}") listenPorts);
+    networking.firewall = mkMerge (
+      map (
+        x:
+        let
+          port = toInt (last x);
+          proto = head x;
+        in
+        if proto == "tcp" then
+          { allowedTCPPorts = [ port ]; }
+        else if proto == "udp" then
+          { allowedUDPPorts = [ port ]; }
+        else
+          throw "unsupported protocol: ${proto}"
+      ) listenPorts
+    );
 
     environment.systemPackages = [ cfg.package ];
   };

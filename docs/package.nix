@@ -1,9 +1,13 @@
-{ stdenvNoCC, lib, nixosOptionsDoc, emanote, hyprspace }:
+{
+  stdenvNoCC,
+  lib,
+  nixosOptionsDoc,
+  emanote,
+  hyprspace,
+}:
 
 let
-  modules = lib.evalModules {
-    modules = [ ../nixos/settings.nix ];
-  };
+  modules = lib.evalModules { modules = [ ../nixos/settings.nix ]; };
 
   optionsDoc = nixosOptionsDoc {
     options = builtins.removeAttrs modules.options [ "_module" ];
@@ -17,9 +21,7 @@ stdenvNoCC.mkDerivation {
 
   src = ./content;
 
-  nativeBuildInputs = [
-    emanote
-  ];
+  nativeBuildInputs = [ emanote ];
 
   buildCommand = ''
     unpackPhase

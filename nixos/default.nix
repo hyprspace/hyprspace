@@ -85,5 +85,7 @@ in
     } else if proto == "udp" then {
       allowedUDPPorts = [ port ];
     } else throw "unsupported protocol: ${proto}") listenPorts);
+
+    environment.systemPackages = [ cfg.package ];
   };
 }

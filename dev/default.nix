@@ -8,7 +8,10 @@
     { config, pkgs, ... }:
     {
       devShells.default = pkgs.mkShell {
-        packages = [ pkgs.go ];
+        packages = [
+          pkgs.go
+          config.formatter
+        ];
 
         shellHook = ''
           export GOPATH="$PWD/.data/go";

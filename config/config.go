@@ -107,6 +107,7 @@ func Read(path string) (*Config, error) {
 		if err != nil {
 			return nil, err
 		}
+		p.Name = configPeer.Name
 		p.BuiltinAddr4 = mkBuiltinAddr4(p.ID)
 		p.BuiltinAddr6 = mkBuiltinAddr6(p.ID)
 		for _, r := range configPeer.Routes {

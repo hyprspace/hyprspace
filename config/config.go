@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/hyprspace/hyprspace/schema"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
@@ -17,18 +18,15 @@ import (
 
 // Config is the main Configuration Struct for Hyprspace.
 type Config struct {
-	Path                   string                         `json:"-"`
-	Interface              string                         `json:"-"`
-	EncodedListenAddresses []string                       `json:"listenAddresses"`
-	ListenAddresses        []multiaddr.Multiaddr          `json:"-"`
-	Peers                  []Peer                         `json:"peers"`
-	PeerLookup             PeerLookup                     `json:"-"`
-	EncodedPrivateKey      string                         `json:"privateKey"`
-	PrivateKey             crypto.PrivKey                 `json:"-"`
-	BuiltinAddr4           net.IP                         `json:"-"`
-	BuiltinAddr6           net.IP                         `json:"-"`
-	EncodedServices        map[string]string              `json:"services,omitempty"`
-	Services               map[string]multiaddr.Multiaddr `json:"-"`
+	Path            string                         `json:"-"`
+	Interface       string                         `json:"-"`
+	ListenAddresses []multiaddr.Multiaddr          `json:"-"`
+	Peers           []Peer                         `json:"peers"`
+	PeerLookup      PeerLookup                     `json:"-"`
+	PrivateKey      crypto.PrivKey                 `json:"-"`
+	BuiltinAddr4    net.IP                         `json:"-"`
+	BuiltinAddr6    net.IP                         `json:"-"`
+	Services        map[string]multiaddr.Multiaddr `json:"-"`
 }
 
 // Peer defines a peer in the configuration. We might add more to this later.
@@ -37,12 +35,6 @@ type Peer struct {
 	Name         string  `json:"name"`
 	BuiltinAddr4 net.IP  `json:"-"`
 	BuiltinAddr6 net.IP  `json:"-"`
-	Routes       []Route `json:"routes"`
-}
-
-type Route struct {
-	NetworkStr string    `json:"net"`
-	Network    net.IPNet `json:"-"`
 }
 
 // PeerLookup is a helper struct for quickly looking up a peer based on various parameters
@@ -67,22 +59,16 @@ func Read(path string) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	result := Config{
-		EncodedListenAddresses: []string{
-			"/ip4/0.0.0.0/tcp/8001",
-			"/ip4/0.0.0.0/udp/8001/quic-v1",
-			"/ip6/::/tcp/8001",
-			"/ip6/::/udp/8001/quic-v1",
-		},
-	}
+	input := schema.Config{}
+	result := Config{}
 
 	// Read in config settings from file.
-	err = json.Unmarshal(in, &result)
+	err = json.Unmarshal(in, &input)
 	if err != nil {
 		return nil, err
 	}
 
-	_, keyBytes, err := multibase.Decode(result.EncodedPrivateKey)
+	_, keyBytes, err := multibase.Decode(input.PrivateKey)
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +88,7 @@ func Read(path string) (*Config, error) {
 	result.BuiltinAddr4 = mkBuiltinAddr4(peerID)
 	result.BuiltinAddr6 = mkBuiltinAddr6(peerID)
 
-	for _, addrString := range result.EncodedListenAddresses {
+	for _, addrString := range input.ListenAddresses {
 		addr, err := multiaddr.NewMultiaddr(addrString)
 		if err != nil {
 			return nil, err
@@ -113,49 +99,52 @@ func Read(path string) (*Config, error) {
 	result.PeerLookup.ByRoute = cidranger.NewPCTrieRanger()
 	result.PeerLookup.ByName = make(map[string]Peer)
 	result.PeerLookup.ByNetID = make(map[[4]byte]Peer)
+	result.Peers = make([]Peer, len(input.Peers))
 
-	for i, p := range result.Peers {
+	for i, configPeer := range input.Peers {
+		p := Peer{}
+		p.ID, err = peer.Decode(configPeer.Id)
+		if err != nil {
+			return nil, err
+		}
 		p.BuiltinAddr4 = mkBuiltinAddr4(p.ID)
 		p.BuiltinAddr6 = mkBuiltinAddr6(p.ID)
-		p.Routes = append(p.Routes,
-			Route{
-				Network: net.IPNet{
-					IP:   p.BuiltinAddr4,
-					Mask: net.IPv4Mask(255, 255, 255, 255),
-				},
-			},
-			Route{
-				Network: net.IPNet{
-					IP:   p.BuiltinAddr6,
-					Mask: net.CIDRMask(128, 128),
-				},
-			},
-		)
-		for _, r := range p.Routes {
-			if r.NetworkStr != "" {
-				_, n, err := net.ParseCIDR(r.NetworkStr)
-				if err != nil {
-					log.Fatal("[!] Invalid network:", r.NetworkStr)
-				}
-				r.Network = *n
+		for _, r := range configPeer.Routes {
+			_, network, err := net.ParseCIDR(r.Net)
+			if err != nil {
+				log.Fatal("[!] Invalid network:", r.Net)
 			}
 
 			result.PeerLookup.ByRoute.Insert(&RouteTableEntry{
-				Net:    r.Network,
+				Net:    *network,
 				Target: p,
 			})
 
-			fmt.Printf("[+] Route %s via /p2p/%s\n", r.Network.String(), p.ID)
+			fmt.Printf("[+] Route %s via /p2p/%s\n", network.String(), p.ID)
 		}
-		if p.Name != "" {
-			result.PeerLookup.ByName[strings.ToLower(p.Name)] = p
+		result.PeerLookup.ByRoute.Insert(&RouteTableEntry{
+			Net: net.IPNet{
+				IP:   p.BuiltinAddr4,
+				Mask: net.CIDRMask(32, 32),
+			},
+			Target: p,
+		})
+		result.PeerLookup.ByRoute.Insert(&RouteTableEntry{
+			Net: net.IPNet{
+				IP:   p.BuiltinAddr6,
+				Mask: net.CIDRMask(128, 128),
+			},
+			Target: p,
+		})
+		if configPeer.Name != "" {
+			result.PeerLookup.ByName[strings.ToLower(configPeer.Name)] = p
 		}
 		result.PeerLookup.ByNetID[[4]byte(p.BuiltinAddr6[12:16])] = p
 		result.Peers[i] = p
 	}
 
 	result.Services = make(map[string]multiaddr.Multiaddr)
-	for name, addrString := range result.EncodedServices {
+	for name, addrString := range input.Services {
 		addr, err := multiaddr.NewMultiaddr(addrString)
 		if err != nil {
 			return nil, err

@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/DataDrake/cli-ng/v2/cmd"
-	"github.com/hyprspace/hyprspace/config"
+	"github.com/hyprspace/hyprspace/schema"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multibase"
@@ -39,16 +39,15 @@ func InitRun(r *cmd.Root, c *cmd.Sub) {
 	keyBytes, err := crypto.MarshalPrivateKey(privKey)
 	checkErr(err)
 
-	// Setup an initial default command.
-	new := config.Config{
-		EncodedPrivateKey: multibase.MustNewEncoder(multibase.Base58BTC).Encode(keyBytes),
-		EncodedListenAddresses: []string{
+	// Setup an initial default config.
+	new := schema.Config{
+		PrivateKey: multibase.MustNewEncoder(multibase.Base58BTC).Encode(keyBytes),
+		ListenAddresses: []string{
 			"/ip4/0.0.0.0/tcp/8001",
 			"/ip4/0.0.0.0/udp/8001/quic-v1",
 			"/ip6/::/tcp/8001",
 			"/ip6/::/udp/8001/quic-v1",
 		},
-		Peers: make([]config.Peer, 0),
 	}
 
 	out, err := json.MarshalIndent(&new, "", "  ")

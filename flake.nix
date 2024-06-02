@@ -31,7 +31,9 @@
         { config, pkgs, ... }:
         {
           packages = {
-            default = pkgs.callPackage ./package.nix {};
+            default = pkgs.callPackage ./package.nix {
+              generateSchemasProgram = config.apps.dev-generate-schemas.program;
+            };
             docs = pkgs.callPackage ./docs/package.nix {
               hyprspace = config.packages.default;
             };

@@ -4,9 +4,13 @@ with lib;
 
 let
   t = {
-    multiAddr = types.strMatching "/.*[^/]" // { description = "multiaddr"; };
+    multiAddr = types.strMatching "/.*[^/]" // {
+      description = "multiaddr";
+    };
 
-    ipnet = types.strMatching "[^/]*/[0-9]*" // { description = "IP/CIDR network"; };
+    ipnet = types.strMatching "[^/]*/[0-9]*" // {
+      description = "IP/CIDR network";
+    };
 
     peer = types.submodule {
       options = {
@@ -24,17 +28,17 @@ let
         };
 
         routes = mkOption {
-          type = types.listOf (types.submodule {
-            options.net = mkOption {
-              type = t.ipnet;
-              description = "Network specification.";
-            };
-          });
+          type = types.listOf (
+            types.submodule {
+              options.net = mkOption {
+                type = t.ipnet;
+                description = "Network specification.";
+              };
+            }
+          );
           description = "Networks to route to this peer. (optional)";
-          default = [];
-          example = [
-            { net = "10.10.0.0/16"; }
-          ];
+          default = [ ];
+          example = [ { net = "10.10.0.0/16"; } ];
         };
       };
     };
@@ -63,7 +67,7 @@ in
     peers = mkOption {
       type = types.listOf t.peer;
       description = "Trusted peers in the network.";
-      default = [];
+      default = [ ];
       example = [
         { id = "12D3KooWKgq4aJpZM8Simple"; }
         {

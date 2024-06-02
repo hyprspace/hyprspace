@@ -22,14 +22,14 @@
         "x86_64-linux"
         "aarch64-linux"
       ];
-      flake.nixosModules.default = { lib, pkgs, ... }: {
-        imports = [ ./nixos ];
-        services.hyprspace.package = lib.mkOptionDefault inputs.self.packages.${pkgs.system}.default;
-      };
+      flake.nixosModules.default =
+        { lib, pkgs, ... }:
+        {
+          imports = [ ./nixos ];
+          services.hyprspace.package = lib.mkOptionDefault inputs.self.packages.${pkgs.system}.default;
+        };
 
-      imports = [
-        ./dev
-      ];
+      imports = [ ./dev ];
 
       perSystem =
         { config, pkgs, ... }:
@@ -38,9 +38,7 @@
             default = pkgs.callPackage ./package.nix {
               generateSchemasProgram = config.apps.dev-generate-schemas.program;
             };
-            docs = pkgs.callPackage ./docs/package.nix {
-              hyprspace = config.packages.default;
-            };
+            docs = pkgs.callPackage ./docs/package.nix { hyprspace = config.packages.default; };
           };
         };
     };

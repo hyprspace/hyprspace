@@ -2,7 +2,7 @@
 let
   inherit (lib.fileset) toSource unions fileFilter;
   pname = "hyprspace";
-  version = "0.9.0";
+  version = "0.10.0";
 in
 buildGoModule {
   inherit pname version;

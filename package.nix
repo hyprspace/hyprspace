@@ -1,4 +1,4 @@
-{ lib, buildGoModule }:
+{ lib, buildGoModule, generateSchemasProgram }:
 let
   inherit (lib.fileset) toSource unions fileFilter;
   pname = "hyprspace";
@@ -25,6 +25,10 @@ buildGoModule {
     "-w"
     "-X github.com/hyprspace/hyprspace/cli.appVersion=${version}"
   ];
+
+  postPatch = ''
+    ( set -x; ${generateSchemasProgram} )
+  '';
 
   meta = {
     description = "A Lightweight VPN Built on top of Libp2p for Truly Distributed Networks.";

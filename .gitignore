@@ -3,3 +3,4 @@ hyprspace
 result
 result-*
 .data/
+*_generated.go

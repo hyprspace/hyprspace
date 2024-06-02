@@ -23,22 +23,20 @@
         "aarch64-linux"
       ];
 
+      imports = [
+        ./dev
+      ];
+
       perSystem =
         { config, pkgs, ... }:
         {
           packages = {
-            default = pkgs.callPackage ./package.nix {};
+            default = pkgs.callPackage ./package.nix {
+              generateSchemasProgram = config.apps.dev-generate-schemas.program;
+            };
             docs = pkgs.callPackage ./docs/package.nix {
               hyprspace = config.packages.default;
             };
-          };
-
-          devShells.default = pkgs.mkShell {
-            packages = [ pkgs.go ];
-
-            shellHook = ''
-              export GOPATH="$PWD/.data/go";
-            '';
           };
         };
     };

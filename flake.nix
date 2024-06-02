@@ -22,6 +22,10 @@
         "x86_64-linux"
         "aarch64-linux"
       ];
+      flake.nixosModules.default = { lib, pkgs, ... }: {
+        imports = [ ./nixos ];
+        services.hyprspace.package = lib.mkOptionDefault inputs.self.packages.${pkgs.system}.default;
+      };
 
       imports = [
         ./dev

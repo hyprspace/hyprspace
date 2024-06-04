@@ -84,6 +84,7 @@ in
     services = mkOption {
       type = types.attrsOf t.multiAddr;
       description = "The services this node provides via the Service Network.";
+      default = { };
       example = {
         "www-local" = "/tcp/8080";
         "gameserver" = "/ip4/10.0.0.2/tcp/27015";

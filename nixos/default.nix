@@ -23,7 +23,7 @@ let
     )
   );
 
-  maybeMetricsPort = mkIf opt.metricsPort.isDefined (toString opt.metricsPort);
+  maybeMetricsPort = mkIf opt.metricsPort.isDefined (toString opt.metricsPort.value);
 
   listenPorts = map (builtins.match "/.*/(tcp|udp)/([0-9]*).*") cfg.settings.listenAddresses;
 in

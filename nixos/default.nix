@@ -5,9 +5,20 @@
   pkgs,
   ...
 }:
-with lib;
 
 let
+  inherit (lib)
+    types
+    mkOption
+    mkEnableOption
+    mkIf
+    mkMerge
+    toInt
+    last
+    head
+    escapeShellArg
+    ;
+
   cfg = config.services.hyprspace;
   opt = options.services.hyprspace;
 
@@ -72,7 +83,7 @@ in
         test -e ${runConfig} && rm ${runConfig}
         cp ${configFile} ${runConfig}
         chmod 0600 ${runConfig}
-        ${pkgs.replace-secret}/bin/replace-secret '${privKeyMarker}' "${cfg.privateKeyFile}" ${runConfig}
+        ${lib.getExe pkgs.replace-secret} '${privKeyMarker}' "${cfg.privateKeyFile}" ${runConfig}
         chmod 0400 ${runConfig}
       '';
 
@@ -80,11 +91,11 @@ in
         Group = "wheel";
         Restart = "on-failure";
         RestartSec = "5s";
-        ExecStart = "${cfg.package}/bin/hyprspace up -c ${
+        ExecStart = "${lib.getExe cfg.package} up -c ${
           if usePrivateKeyFromFile then runConfig else configFile
         } -i ${escapeShellArg cfg.interface}";
-        ExecStopPost = "${pkgs.coreutils}/bin/rm -f ${escapeShellArg "/run/hyprspace-rpc.${cfg.interface}.sock"}";
-        ExecReload = "${pkgs.coreutils}/bin/kill -USR1 $MAINPID";
+        ExecStopPost = "${lib.getExe' pkgs.coreutils "rm"} -f ${escapeShellArg "/run/hyprspace-rpc.${cfg.interface}.sock"}";
+        ExecReload = "${lib.getExe' pkgs.coreutils "kill"} -USR1 $MAINPID";
       };
 
       environment.HYPRSPACE_METRICS_PORT = maybeMetricsPort;

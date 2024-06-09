@@ -19,7 +19,7 @@
         if [[ "$GOFILE" != "generate.go" ]]; then
           cd schema
         fi
-        ${go-jsonschema}/bin/go-jsonschema -p schema ${schemaFile} --tags json -t -o config_generated.go
+        ${lib.getExe go-jsonschema} -p schema ${schemaFile} --tags json -t -o config_generated.go
       '';
     };
 }

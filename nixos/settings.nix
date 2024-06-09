@@ -1,8 +1,8 @@
 { lib, ... }:
-
-with lib;
-
 let
+
+  inherit (lib) types mkOption;
+
   t = {
     multiAddr = types.strMatching "/.*[^/]" // {
       description = "multiaddr";

@@ -21,7 +21,7 @@
             touch $out
           '';
           format-go = pkgs.runCommandNoCC "format-go" { } ''
-            test "$(${pkgs.go}/bin/gofmt -l ${filesWithExtension "go"} | tee /dev/stderr | wc -l)" == 0
+            test "$(${lib.getExe' pkgs.go "gofmt"} -l ${filesWithExtension "go"} | tee /dev/stderr | wc -l)" == 0
             touch $out
           '';
         };

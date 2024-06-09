@@ -1,6 +1,6 @@
 {
-  stdenvNoCC,
   lib,
+  runCommand,
   nixosOptionsDoc,
   emanote,
   hyprspace,
@@ -15,15 +15,12 @@ let
   };
 in
 
-stdenvNoCC.mkDerivation {
-  pname = "hyprspace-docs";
-  inherit (hyprspace) version;
-
-  src = ./content;
-
-  nativeBuildInputs = [ emanote ];
-
-  buildCommand = ''
+runCommand "hyprspace-docs-${hyprspace.version}"
+  {
+    src = ./content;
+    nativeBuildInputs = [ emanote ];
+  }
+  ''
     unpackPhase
     cd "$sourceRoot"
 
@@ -32,5 +29,4 @@ stdenvNoCC.mkDerivation {
     cat ${optionsDoc.optionsCommonMark} >> ./configuration.md
     mkdir -p $out/share/www/$pname
     emanote -L . gen $out/share/www/$pname
-  '';
-}
+  ''

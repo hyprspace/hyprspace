@@ -291,7 +291,18 @@ func CreateNode(ctx context.Context, privateKey crypto.PrivKey, listenAddreses [
 		for {
 			for _, p := range node.Network().Peers() {
 				pi := node.Network().Peerstore().PeerInfo(p)
-				peerChan <- pi
+				relayCount := 0
+				for _, la := range node.Network().ListenAddresses() {
+					for _, proto := range la.Protocols() {
+						if proto.Code == ma.P_CIRCUIT {
+							relayCount = relayCount + 1
+							break
+						}
+					}
+				}
+				if relayCount < 2 || acl.AllowReserve(p, node.Addrs()[0]) {
+					peerChan <- pi
+				}
 			}
 			time.Sleep(delay.Delay())
 		}

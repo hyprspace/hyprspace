@@ -15,7 +15,7 @@ https://user-images.githubusercontent.com/19558067/152407636-a5f4ae1f-9493-4346-
 - [Use Cases](#use-cases)
   - [A Digital Nomad](#a-digital-nomad)
   - [A Privacy Advocate](#a-privacy-advocate)
-- [Prerequisites](#prerequisites)
+- [Installation](#installation)
 - [Usage](#usage)
   - [Commands](#commands)
 - [Tutorial](#tutorial)
@@ -50,9 +50,37 @@ If anyone else has some use cases please add them! Pull requests welcome!
 
 ## Getting Started
 
-### Prerequisites
+### Installation
 
-If you're running Hyprspace on Windows you'll need to install [tap-windows](http://build.openvpn.net/downloads/releases/).
+Hyprspace requires [Nix](https://nixos.org/) to build.
+
+```shell-session
+$ nix build github:hyprspace/hyprspace
+```
+
+Hyprspace also offers a NixOS module. To use it, simply import `nixosModules.default` in your NixOS configuration and use the options under `services.hyprspace`.
+This will create a systemd service that runs `hyprspace up` with a generated config file.
+
+```nix
+{
+  services.hyprspace = {
+    enable = true;
+
+    # To get a private key and peer ID, use `hyprspace init`
+    privateKeyFile = "/example/secrets/hyprspace-private-key";
+
+    # Same as the config file
+    settings = {
+      peers = [
+        { id = "12D3KooWKgq4aJpZM8Peer1"; }
+        { id = "12D3KooWKgq4aJpZM8Peer2"; }
+      ];
+    };
+  };
+}
+```
+
+Also take a look at the [configuration docs](https://docs.hyprspace.privatevoid.net/configuration.html).
 
 ## Usage
 

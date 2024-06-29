@@ -43,5 +43,6 @@ buildGoModule {
       yusdacra
     ];
     platforms = lib.platforms.linux ++ lib.platforms.darwin;
+    mainProgram = "hyprspace";
   };
 }

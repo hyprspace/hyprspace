@@ -27,6 +27,6 @@ runCommand "hyprspace-docs-${hyprspace.version}"
     cp ${../hyprspace.png} ./favicon.png
     cp ${./emanote-config.json} ./index.yaml
     cat ${optionsDoc.optionsCommonMark} >> ./configuration.md
-    mkdir -p $out/share/www/$pname
-    emanote -L . gen $out/share/www/$pname
+    mkdir -p $out/share/www/hyprspace-docs
+    emanote -L . gen $out/share/www/hyprspace-docs
   ''

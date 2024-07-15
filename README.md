@@ -19,6 +19,7 @@ https://user-images.githubusercontent.com/19558067/152407636-a5f4ae1f-9493-4346-
 - [Usage](#usage)
   - [Commands](#commands)
 - [Tutorial](#tutorial)
+- [Hacking](#hacking)
 
 ## About the Fork
 
@@ -241,6 +242,10 @@ Addresses:
 
 ### Stopping the Interface and Cleaning Up
 Now to stop the interface and clean up the system, simply kill the proceses (for example, by pressing Ctrl+C where you started it).
+
+## Hacking
+
+If you want to hack on Hyprspace, check out the [development docs](https://docs.hyprspace.privatevoid.net/Development.html) for a quick introduction.
 
 ## Disclaimer & Copyright
 

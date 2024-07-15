@@ -10,6 +10,12 @@ To use it, simply run:
 $ nix develop
 ```
 
+You can also use [direnv](https://direnv.net).
+
+```shell-session
+$ direnv allow  
+```
+
 ## Building
 
 To build Hyprspace for testing during development, you first need to generate the [[config-schema]] code. This is always done automatically upon entering the devShell. If you made changes to the config schema, you can regenerate the Go code (requires Nix):

@@ -4,3 +4,4 @@ result
 result-*
 .data/
 *_generated.go
+.direnv/

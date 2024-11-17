@@ -282,8 +282,10 @@ func sendPacket(dst peer.ID, packet []byte, plen int) {
 				// If everyting succeeds continue on to the next packet.
 				_, err = (*ms.Stream).Write(packet[:plen])
 				if err == nil {
-					(*ms.Stream).SetWriteDeadline(time.Now().Add(25 * time.Second))
-					return true
+					err := (*ms.Stream).SetWriteDeadline(time.Now().Add(25 * time.Second))
+					if err == nil {
+						return true
+					}
 				}
 			}
 			// If we encounter an error when writing to a stream we should
@@ -302,7 +304,12 @@ func sendPacket(dst peer.ID, packet []byte, plen int) {
 		go p2p.Rediscover()
 		return
 	}
-	stream.SetWriteDeadline(time.Now().Add(25 * time.Second))
+	err = stream.SetWriteDeadline(time.Now().Add(25 * time.Second))
+	if err != nil {
+		fmt.Println("[!] Failed to set write deadline: " + err.Error())
+		stream.Close()
+		return
+	}
 	// Write packet length
 	err = binary.Write(stream, binary.LittleEndian, uint16(plen))
 	if err != nil {
@@ -351,7 +358,8 @@ func signalHandler(ctx context.Context, host host.Host, lockPath string, dht *dh
 			fmt.Println("Received signal, shutting down...")
 
 			tunDev.Iface.Close()
-			tunDev.Down()
+			err = tunDev.Down()
+			checkErr(err)
 			ctxCancel()
 		}
 	}
@@ -411,7 +419,12 @@ func streamHandler(stream network.Stream) {
 				return
 			}
 		}
-		stream.SetWriteDeadline(time.Now().Add(25 * time.Second))
-		tunDev.Iface.Write(packet[:size])
+		err = stream.SetWriteDeadline(time.Now().Add(25 * time.Second))
+		if err != nil {
+			fmt.Println("[!] Failed to set write deadline: " + err.Error())
+			stream.Close()
+			return
+		}
+		_, _ = tunDev.Iface.Write(packet[:size])
 	}
 }

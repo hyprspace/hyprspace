@@ -51,8 +51,6 @@ func (c *httpRoutingWrapper) Bootstrap(ctx context.Context) error {
 // Protocol is a descriptor for the Hyprspace P2P Protocol.
 const Protocol = "/hyprspace/0.0.1"
 
-var bootstrapTriggerChan = make(chan bool)
-
 func getExtraPeers(addr ma.Multiaddr) (nodesList []string) {
 	nodesList = []string{}
 	ip4, err := addr.ValueForProtocol(ma.P_IP4)

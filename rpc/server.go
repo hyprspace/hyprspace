@@ -7,7 +7,7 @@ import (
 	"log"
 	"net"
 	"net/rpc"
-	"os"
+	"syscall"
 
 	"github.com/hyprspace/hyprspace/config"
 	"github.com/hyprspace/hyprspace/p2p"
@@ -171,12 +171,18 @@ func RpcServer(ctx context.Context, ma multiaddr.Multiaddr, host host.Host, conf
 	if err != nil {
 		log.Fatal("[!] Failed to parse multiaddr: ", err)
 	}
+
+	var l net.Listener
+	oldUmask := syscall.Umask(0o007)
+
 	var lc net.ListenConfig
-	l, err := lc.Listen(ctx, "unix", addr)
-	os.Chmod(addr, 0o0770)
+	l, err = lc.Listen(ctx, "unix", addr)
+	syscall.Umask(oldUmask)
+
 	if err != nil {
 		log.Fatal("[!] Failed to launch RPC server: ", err)
 	}
+
 	fmt.Println("[-] RPC server ready")
 	go rpc.Accept(l)
 	<-ctx.Done()

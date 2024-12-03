@@ -6,6 +6,7 @@ package tun
 import (
 	"fmt"
 	"os/exec"
+	"os"
 
 	"github.com/songgao/water"
 )
@@ -68,5 +69,8 @@ func Delete(name string) error {
 
 func ifconfig(args ...string) error {
 	cmd := exec.Command("ifconfig", args...)
+	cmd.Stderr = os.Stderr
+	cmd.Stdout = os.Stdout
 	return cmd.Run()
 }
+

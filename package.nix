@@ -20,7 +20,7 @@ buildGoModule {
     ];
   };
 
-  CGO_ENABLED = "0";
+  env.CGO_ENABLED = "0";
 
   vendorHash = "sha256-umaZs6L6lzBP45WiU2+dMweXgxQmektOY8eQ/jbmv4c=";
 

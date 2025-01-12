@@ -22,7 +22,7 @@ buildGoModule {
 
   env.CGO_ENABLED = "0";
 
-  vendorHash = "sha256-umaZs6L6lzBP45WiU2+dMweXgxQmektOY8eQ/jbmv4c=";
+  vendorHash = "sha256-tZOm79aaU6+daCJ1x5fcHqcOKt7WEjbg9xqn+Z3mh2g=";
 
   ldflags = [
     "-s"

@@ -2,6 +2,7 @@
   imports = [
     ./generate-schemas.nix
     ./formatting.nix
+    ./jobs/release.nix
   ];
 
   perSystem =

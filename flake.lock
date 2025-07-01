@@ -20,6 +20,30 @@
         "type": "github"
       }
     },
+    "hercules-ci-effects": {
+      "inputs": {
+        "flake-parts": [
+          "flake-parts"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1751406060,
+        "narHash": "sha256-xlxgYZ0eCnr9ikQuM5VuD8rUjLdbGzSKgF2EoRKDn/8=",
+        "owner": "max-privatevoid",
+        "repo": "hercules-ci-effects",
+        "rev": "b8127446a483cfd91495037e343b592662033188",
+        "type": "github"
+      },
+      "original": {
+        "owner": "max-privatevoid",
+        "ref": "pr/skip-if-exists",
+        "repo": "hercules-ci-effects",
+        "type": "github"
+      }
+    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1751011381,
@@ -39,6 +63,7 @@
     "root": {
       "inputs": {
         "flake-parts": "flake-parts",
+        "hercules-ci-effects": "hercules-ci-effects",
         "nixpkgs": "nixpkgs"
       }
     }

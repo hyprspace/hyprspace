@@ -7,6 +7,13 @@
       url = "github:hercules-ci/flake-parts";
       inputs.nixpkgs-lib.follows = "nixpkgs";
     };
+    hercules-ci-effects = {
+      url = "github:max-privatevoid/hercules-ci-effects/pr/skip-if-exists";
+      inputs = {
+        nixpkgs.follows = "nixpkgs";
+        flake-parts.follows = "flake-parts";
+      };
+    };
   };
 
   outputs =
@@ -18,13 +25,13 @@
         "aarch64-darwin"
         "x86_64-darwin"
       ];
+      herculesCI.ciSystems = [
+        "x86_64-linux"
+        "aarch64-linux"
+      ];
       flake =
         { config, ... }:
         {
-          herculesCI.ciSystems = [
-            "x86_64-linux"
-            "aarch64-linux"
-          ];
           nixosModules = {
             default = config.nixosModules.hyprspace;
             hyprspace =
@@ -36,7 +43,10 @@
           };
         };
 
-      imports = [ ./dev ];
+      imports = [
+        inputs.hercules-ci-effects.flakeModule
+        ./dev
+      ];
 
       perSystem =
         { config, pkgs, ... }:

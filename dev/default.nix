@@ -13,6 +13,8 @@
           config.formatter
         ];
 
+        env.GOTOOLCHAIN = "local";
+
         shellHook = ''
           export GOPATH="$PWD/.data/go";
           ${config.apps.dev-generate-schemas.program}

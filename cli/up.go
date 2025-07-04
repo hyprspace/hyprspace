@@ -11,13 +11,13 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"sync"
 	"syscall"
 	"time"
 
 	"github.com/DataDrake/cli-ng/v2/cmd"
 	"github.com/hyprspace/hyprspace/config"
 	hsdns "github.com/hyprspace/hyprspace/dns"
+	hsnet "github.com/hyprspace/hyprspace/net"
 	"github.com/hyprspace/hyprspace/p2p"
 	hsrpc "github.com/hyprspace/hyprspace/rpc"
 	"github.com/hyprspace/hyprspace/svc"
@@ -32,11 +32,6 @@ import (
 	"github.com/yl2chen/cidranger"
 )
 
-type MuxStream struct {
-	Stream *network.Stream
-	Lock   *sync.Mutex
-}
-
 var (
 	cfg  *config.Config
 	node host.Host
@@ -44,7 +39,9 @@ var (
 	// Hyprspace and the user's machine.
 	tunDev *tun.TUN
 	// activeStreams is a map of active streams to a peer
-	activeStreams map[peer.ID]MuxStream
+	activeStreams map[peer.ID]*network.Stream
+	// packetQueues
+	packetQueues map[peer.ID](chan *hsnet.Packet)
 	// context
 	ctx context.Context
 	// context cancel function
@@ -167,6 +164,21 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 		fmt.Printf("[+] Listening for metrics scrape requests on http://%s/metrics\n", metricsTuple)
 	}
 
+	packetQueues = make(map[peer.ID]chan *hsnet.Packet)
+	for _, peer := range cfg.Peers {
+		packetQueues[peer.ID] = make(chan *hsnet.Packet, 128)
+		go func() {
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case packet := <-packetQueues[peer.ID]:
+					sendPacket(peer.ID, packet)
+				}
+			}
+		}()
+	}
+
 	serviceNet := svc.NewServiceNetwork(host, cfg, tunDev)
 
 	for name, addr := range cfg.Services {
@@ -212,7 +224,7 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 	// + ----------------------------------------+
 
 	// Initialize active streams map and packet byte array.
-	activeStreams = make(map[peer.ID]MuxStream)
+	activeStreams = make(map[peer.ID]*network.Stream)
 	for {
 		var packet = make([]byte, 1420)
 		// Read in a packet from the tun device.
@@ -262,38 +274,26 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 
 		if found {
 			dst = route.Target.ID
-			go sendPacket(dst, packet, plen)
+			p := hsnet.Packet{
+				Length: uint16(plen),
+				Packet: [1420]byte(packet),
+			}
+			select {
+			case packetQueues[dst] <- &p:
+			default:
+				// drop oldest packet and try again
+				<-packetQueues[dst]
+				packetQueues[dst] <- &p
+			}
 		}
 	}
 }
 
-func sendPacket(dst peer.ID, packet []byte, plen int) {
+func sendPacket(dst peer.ID, packet *hsnet.Packet) {
 	// Check if we already have an open connection to the destination peer.
 	ms, ok := activeStreams[dst]
 	if ok {
-		if func() bool {
-			ms.Lock.Lock()
-			defer ms.Lock.Unlock()
-			// Write out the packet's length to the libp2p stream to ensure
-			// we know the full size of the packet at the other end.
-			err := binary.Write(*ms.Stream, binary.LittleEndian, uint16(plen))
-			if err == nil {
-				// Write the packet out to the libp2p stream.
-				// If everyting succeeds continue on to the next packet.
-				_, err = (*ms.Stream).Write(packet[:plen])
-				if err == nil {
-					err := (*ms.Stream).SetWriteDeadline(time.Now().Add(25 * time.Second))
-					if err == nil {
-						return true
-					}
-				}
-			}
-			// If we encounter an error when writing to a stream we should
-			// close that stream and delete it from the active stream map.
-			(*ms.Stream).Close()
-			delete(activeStreams, dst)
-			return false
-		}() {
+		if writePacketToReusedStream(dst, ms, packet) {
 			return
 		}
 	}
@@ -310,25 +310,37 @@ func sendPacket(dst peer.ID, packet []byte, plen int) {
 		stream.Close()
 		return
 	}
-	// Write packet length
-	err = binary.Write(stream, binary.LittleEndian, uint16(plen))
+	err = writePacketToStream(&stream, packet)
 	if err != nil {
-		stream.Close()
-		return
-	}
-	// Write the packet
-	_, err = stream.Write(packet[:plen])
-	if err != nil {
-		stream.Close()
 		return
 	}
 
 	// If all succeeds when writing the packet to the stream
 	// we should reuse this stream by adding it active streams map.
-	activeStreams[dst] = MuxStream{
-		Stream: &stream,
-		Lock:   &sync.Mutex{},
+	activeStreams[dst] = &stream
+}
+
+func writePacketToStream(stream *network.Stream, packet *hsnet.Packet) error {
+	// Write packet length
+	err := binary.Write(*stream, binary.LittleEndian, packet.Length)
+	if err != nil {
+		return err
 	}
+	// Write the packet
+	_, err = (*stream).Write(packet.Packet[:packet.Length])
+	return err
+}
+
+func writePacketToReusedStream(dst peer.ID, stream *network.Stream, packet *hsnet.Packet) bool {
+	err := writePacketToStream(stream, packet)
+	if err == nil {
+		return true
+	}
+	// If we encounter an error when writing to a stream we should
+	// close that stream and delete it from the active stream map.
+	(*stream).Close()
+	delete(activeStreams, dst)
+	return false
 }
 
 func signalHandler(ctx context.Context, host host.Host, lockPath string, dht *dht.IpfsDHT) {

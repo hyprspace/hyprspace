@@ -12,7 +12,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	routedhost "github.com/libp2p/go-libp2p/p2p/host/routed"
 	ma "github.com/multiformats/go-multiaddr"
-	"github.com/vishvananda/netlink"
 )
 
 type ParallelRouting struct {
@@ -53,13 +52,13 @@ type RecursionGater struct {
 }
 
 func NewRecursionGater(config *config.Config) RecursionGater {
-	link, err := netlink.LinkByName(config.Interface)
+	iface, err := net.InterfaceByName(config.Interface)
 	if err != nil {
 		panic(err)
 	}
 	return RecursionGater{
 		config:  config,
-		ifindex: link.Attrs().Index,
+		ifindex: iface.Index,
 	}
 }
 

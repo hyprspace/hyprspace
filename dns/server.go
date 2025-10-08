@@ -14,7 +14,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/miekg/dns"
 	"github.com/multiformats/go-multibase"
-	"github.com/vishvananda/netlink"
 )
 
 func domainSuffix(config config.Config) string {
@@ -203,12 +202,12 @@ func MagicDnsServer(ctx context.Context, config config.Config, node host.Host) {
 	}
 	defer conn.Close()
 
-	link, err := netlink.LinkByName(config.Interface)
+	iface, err := net.InterfaceByName(config.Interface)
 	if err != nil {
 		fmt.Println("[!] [dns] Failed to get link ID:", err)
 		return
 	}
-	linkID := link.Attrs().Index
+	linkID := iface.Index
 
 	for _, f := range [](func() error){
 		func() error {

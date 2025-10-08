@@ -203,7 +203,7 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 	// Bring Up TUN Device
 	err = tunDev.Up()
 	if err != nil {
-		checkErr(errors.New("unable to bring up tun device"))
+		checkErr(fmt.Errorf("unable to bring up tun device: %w", err))
 	}
 	checkErr(tunDev.Apply(routeOpts...))
 

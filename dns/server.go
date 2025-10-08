@@ -172,13 +172,12 @@ func MagicDnsServer(ctx context.Context, config config.Config, node host.Host) {
 		w.WriteMsg(m)
 	})
 
-	dnsServerAddrBytes := []byte{127, 80, 01, 53}
+	dnsServerAddr := getDNSServerAddr(config.Interface)
+	dnsServerAddrBytes := []byte(dnsServerAddr.To4())
 	var dnsServerPort uint16 = 5380
-	for i, b := range []byte(config.Interface) {
-		dnsServerAddrBytes[(i%3)+1] ^= b
+	for _, b := range []byte(config.Interface) {
 		dnsServerPort = (dnsServerPort+uint16(b))%40000 + 5000
 	}
-	dnsServerAddr := net.IP(dnsServerAddrBytes)
 	for _, netType := range []string{"tcp", "udp"} {
 		sv := &dns.Server{
 			Addr:      fmt.Sprintf("%s:%d", dnsServerAddr, dnsServerPort),

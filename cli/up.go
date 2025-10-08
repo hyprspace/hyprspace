@@ -90,6 +90,8 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 	if err != nil {
 		checkErr(err)
 	}
+	// Update config with actual interface name (important on macOS where name is assigned by OS)
+	cfg.Interface = tunDev.Iface.Name()
 	allRoutes4, err := cfg.PeerLookup.ByRoute.CoveredNetworks(*cidranger.AllIPv4)
 	if err != nil {
 		checkErr(err)

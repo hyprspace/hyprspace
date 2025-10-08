@@ -10,6 +10,8 @@ type TUN struct {
 	MTU   int
 	Src   string
 	Dst   string
+	Src6  string
+	Dst6  string
 }
 
 // Apply configures the specified options for a TUN device.

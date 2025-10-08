@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"net/rpc"
+	"os"
 	"syscall"
 
 	"github.com/hyprspace/hyprspace/config"
@@ -163,6 +164,34 @@ func (hsr *HyprspaceRPC) Peers(args *Args, reply *PeersReply) error {
 	return nil
 }
 
+func listenUnixSocket(ctx context.Context, addr string) (net.Listener, error) {
+	oldUmask := syscall.Umask(0o007)
+	defer syscall.Umask(oldUmask)
+
+	var lc net.ListenConfig
+	l, err := lc.Listen(ctx, "unix", addr)
+	if err != nil {
+		// Check if socket exists and is stale
+		if _, statErr := os.Stat(addr); statErr == nil {
+			// Try to dial the socket to see if it's actually in use
+			if conn, dialErr := net.Dial("unix", addr); dialErr != nil {
+				// Socket exists but can't connect - it's stale, remove it
+				fmt.Println("[-] Removing stale RPC socket")
+				_ = os.Remove(addr)
+				// Retry listen
+				oldUmask = syscall.Umask(0o007)
+				l, err = lc.Listen(ctx, "unix", addr)
+				syscall.Umask(oldUmask)
+			} else {
+				// Socket is actually in use by another process
+				_ = conn.Close()
+				return nil, err
+			}
+		}
+	}
+	return l, err
+}
+
 func RpcServer(ctx context.Context, ma multiaddr.Multiaddr, host host.Host, config config.Config, tunDev tun.TUN) {
 	hsr := HyprspaceRPC{host, config, tunDev}
 	rpc.Register(&hsr)
@@ -172,13 +201,7 @@ func RpcServer(ctx context.Context, ma multiaddr.Multiaddr, host host.Host, conf
 		log.Fatal("[!] Failed to parse multiaddr: ", err)
 	}
 
-	var l net.Listener
-	oldUmask := syscall.Umask(0o007)
-
-	var lc net.ListenConfig
-	l, err = lc.Listen(ctx, "unix", addr)
-	syscall.Umask(oldUmask)
-
+	l, err := listenUnixSocket(ctx, addr)
 	if err != nil {
 		log.Fatal("[!] Failed to launch RPC server: ", err)
 	}
@@ -188,4 +211,5 @@ func RpcServer(ctx context.Context, ma multiaddr.Multiaddr, host host.Host, conf
 	<-ctx.Done()
 	fmt.Println("[-] Closing RPC server")
 	l.Close()
+	_ = os.Remove(addr)
 }

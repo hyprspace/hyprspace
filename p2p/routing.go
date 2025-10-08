@@ -67,11 +67,9 @@ func (rg RecursionGater) InterceptAddrDial(pid peer.ID, addr ma.Multiaddr) bool 
 		ip4 := net.ParseIP(ip4str)
 		if rte, ok := rg.config.FindRouteForIP(ip4); ok {
 			if rte.Target.ID == pid {
-				routes, err := netlink.RouteGet(ip4)
-				if err == nil {
-					if len(routes) > 0 && routes[0].LinkIndex == rg.ifindex {
-						return false
-					}
+				routeIfindex := getRouteInterface(ip4)
+				if routeIfindex == rg.ifindex {
+					return false
 				}
 			}
 		}

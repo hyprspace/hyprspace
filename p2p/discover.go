@@ -10,6 +10,8 @@ import (
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/multiformats/go-multiaddr"
 )
 
 var discoverNow = make(chan bool)
@@ -34,7 +36,10 @@ func Discover(ctx context.Context, wg *sync.WaitGroup, h host.Host, dht *dht.Ipf
 			connectedToAny := false
 			for _, p := range peers {
 				if h.Network().Connectedness(p.ID) != network.Connected {
-					_, err := h.Network().DialPeer(ctx, p.ID)
+					err := h.Connect(ctx, peer.AddrInfo{
+						ID:    p.ID,
+						Addrs: []multiaddr.Multiaddr{},
+					})
 					if err != nil {
 						continue
 					}
@@ -50,10 +55,7 @@ func Discover(ctx context.Context, wg *sync.WaitGroup, h host.Host, dht *dht.Ipf
 				dur = time.Second * 10
 				ticker.Reset(dur)
 			} else {
-				dur = dur * 2
-				if dur >= time.Second*60 {
-					dur = time.Second * 60
-				}
+				dur = min(dur*2, time.Minute)
 				ticker.Reset(dur)
 			}
 		}

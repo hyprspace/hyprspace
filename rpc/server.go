@@ -187,8 +187,8 @@ func RpcServer(ctx context.Context, wg *sync.WaitGroup, ma multiaddr.Multiaddr, 
 	}
 
 	fmt.Println("[-] RPC server ready")
+	defer l.Close()
 	go rpc.Accept(l)
 	<-ctx.Done()
 	fmt.Println("[-] Closing RPC server")
-	l.Close()
 }

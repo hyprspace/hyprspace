@@ -417,11 +417,11 @@ func (node *Node) Stop() error {
 
 	fmt.Println("Received signal, shutting down...")
 
-	node.tunDev.Iface.Close()
 	err = node.tunDev.Down()
 	if err != nil {
 		return err
 	}
+	node.tunDev.Iface.Close()
 	node.cancel()
 	return nil
 }

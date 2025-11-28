@@ -3,6 +3,7 @@ package p2p
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/hyprspace/hyprspace/config"
@@ -14,11 +15,13 @@ import (
 var discoverNow = make(chan bool)
 
 // Discover starts up a DHT based discovery system finding and adding nodes with the same rendezvous string.
-func Discover(ctx context.Context, h host.Host, dht *dht.IpfsDHT, peers []config.Peer) {
+func Discover(ctx context.Context, wg *sync.WaitGroup, h host.Host, dht *dht.IpfsDHT, peers []config.Peer) {
 	dur := time.Second * 1
 	ticker := time.NewTicker(dur)
 	defer ticker.Stop()
 
+	wg.Add(1)
+	defer wg.Done()
 	for {
 		select {
 		case <-ctx.Done():

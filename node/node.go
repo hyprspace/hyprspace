@@ -45,6 +45,7 @@ type Node struct {
 	lockPath      string
 	configPath    string
 	interfaceName string
+	wg            *sync.WaitGroup
 }
 
 func New(ctx context.Context, configPath string, ifName string) Node {
@@ -122,19 +123,21 @@ func (node *Node) Run() error {
 		node.p2p.ConnManager().Protect(p.ID, "/hyprspace/peer")
 	}
 
+	node.wg = &sync.WaitGroup{}
+
 	fmt.Println("[+] Setting Up Node Discovery via DHT")
 
 	// Setup P2P Discovery
-	go p2p.Discover(node.ctx, node.p2p, node.dht, node.cfg.Peers)
+	go p2p.Discover(node.ctx, node.wg, node.p2p, node.dht, node.cfg.Peers)
 
 	// Configure path for lock
 	node.lockPath = filepath.Join(filepath.Dir(node.cfg.Path), node.cfg.Interface+".lock")
 
 	// PeX
-	go p2p.PeXService(node.ctx, node.p2p, node.cfg)
+	go p2p.PeXService(node.ctx, node.wg, node.p2p, node.cfg)
 
 	// Route metrics and latency
-	go p2p.RouteMetricsService(node.ctx, node.p2p, node.cfg)
+	go p2p.RouteMetricsService(node.ctx, node.wg, node.p2p, node.cfg)
 
 	// Log about various events
 	err = node.eventLogger(node.ctx, node.p2p)
@@ -143,10 +146,10 @@ func (node *Node) Run() error {
 	}
 
 	// RPC server
-	go hsrpc.RpcServer(node.ctx, multiaddr.StringCast(fmt.Sprintf("/unix/run/hyprspace-rpc.%s.sock", node.cfg.Interface)), node.p2p, *node.cfg, *node.tunDev)
+	go hsrpc.RpcServer(node.ctx, node.wg, multiaddr.StringCast(fmt.Sprintf("/unix/run/hyprspace-rpc.%s.sock", node.cfg.Interface)), node.p2p, *node.cfg, *node.tunDev)
 
 	// Magic DNS server
-	go hsdns.MagicDnsServer(node.ctx, *node.cfg, node.p2p)
+	go hsdns.MagicDnsServer(node.ctx, node.wg, *node.cfg, node.p2p)
 
 	// metrics endpoint
 	metricsPort, ok := os.LookupEnv("HYPRSPACE_METRICS_PORT")
@@ -377,6 +380,7 @@ func (node *Node) eventLogger(ctx context.Context, host host.Host) error {
 		for {
 			select {
 			case <-ctx.Done():
+				node.wg.Done()
 				return
 			case ev := <-subCon.Out():
 				evt := ev.(event.EvtPeerConnectednessChanged)
@@ -423,5 +427,6 @@ func (node *Node) Stop() error {
 	}
 	node.tunDev.Iface.Close()
 	node.cancel()
+	node.wg.Wait()
 	return nil
 }

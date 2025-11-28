@@ -52,7 +52,7 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 				<-exitCh
 				log.Fatal("Terminating immediately.")
 			}()
-			node.Stop()
+			checkErr(node.Stop())
 			os.Exit(0)
 		}
 	}

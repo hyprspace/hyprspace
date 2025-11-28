@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"net/rpc"
+	"sync"
 	"syscall"
 
 	"github.com/hyprspace/hyprspace/config"
@@ -163,7 +164,9 @@ func (hsr *HyprspaceRPC) Peers(args *Args, reply *PeersReply) error {
 	return nil
 }
 
-func RpcServer(ctx context.Context, ma multiaddr.Multiaddr, host host.Host, config config.Config, tunDev tun.TUN) {
+func RpcServer(ctx context.Context, wg *sync.WaitGroup, ma multiaddr.Multiaddr, host host.Host, config config.Config, tunDev tun.TUN) {
+	wg.Add(1)
+	defer wg.Done()
 	hsr := HyprspaceRPC{host, config, tunDev}
 	rpc.Register(&hsr)
 

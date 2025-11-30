@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/hyprspace/hyprspace/config"
@@ -111,12 +112,14 @@ func RequestPeX(ctx context.Context, host host.Host, peers []peer.ID) (addrInfos
 	return addrInfos, nil
 }
 
-func PeXService(ctx context.Context, host host.Host, cfg *config.Config) {
+func PeXService(ctx context.Context, wg *sync.WaitGroup, host host.Host, cfg *config.Config) {
 	subCon, err := host.EventBus().Subscribe(new(event.EvtPeerConnectednessChanged))
 	if err != nil {
 		log.Fatal(err)
 	}
 	fmt.Println("[-] PeX service ready")
+	wg.Add(1)
+	defer wg.Done()
 	for {
 		select {
 		case <-ctx.Done():

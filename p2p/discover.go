@@ -3,22 +3,27 @@ package p2p
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/hyprspace/hyprspace/config"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/multiformats/go-multiaddr"
 )
 
 var discoverNow = make(chan bool)
 
 // Discover starts up a DHT based discovery system finding and adding nodes with the same rendezvous string.
-func Discover(ctx context.Context, h host.Host, dht *dht.IpfsDHT, peers []config.Peer) {
+func Discover(ctx context.Context, wg *sync.WaitGroup, h host.Host, dht *dht.IpfsDHT, peers []config.Peer) {
 	dur := time.Second * 1
 	ticker := time.NewTicker(dur)
 	defer ticker.Stop()
 
+	wg.Add(1)
+	defer wg.Done()
 	for {
 		select {
 		case <-ctx.Done():
@@ -31,7 +36,10 @@ func Discover(ctx context.Context, h host.Host, dht *dht.IpfsDHT, peers []config
 			connectedToAny := false
 			for _, p := range peers {
 				if h.Network().Connectedness(p.ID) != network.Connected {
-					_, err := h.Network().DialPeer(ctx, p.ID)
+					err := h.Connect(ctx, peer.AddrInfo{
+						ID:    p.ID,
+						Addrs: []multiaddr.Multiaddr{},
+					})
 					if err != nil {
 						continue
 					}
@@ -47,10 +55,7 @@ func Discover(ctx context.Context, h host.Host, dht *dht.IpfsDHT, peers []config
 				dur = time.Second * 10
 				ticker.Reset(dur)
 			} else {
-				dur = dur * 2
-				if dur >= time.Second*60 {
-					dur = time.Second * 60
-				}
+				dur = min(dur*2, time.Minute)
 				ticker.Reset(dur)
 			}
 		}

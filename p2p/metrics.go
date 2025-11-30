@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/hyprspace/hyprspace/config"
@@ -13,12 +14,14 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/protocol/ping"
 )
 
-func RouteMetricsService(ctx context.Context, host host.Host, cfg *config.Config) {
+func RouteMetricsService(ctx context.Context, wg *sync.WaitGroup, host host.Host, cfg *config.Config) {
 	subCon, err := host.EventBus().Subscribe(new(event.EvtPeerConnectednessChanged))
 	if err != nil {
 		log.Fatal(err)
 	}
 	fmt.Println("[-] Route metrics service ready")
+	wg.Add(1)
+	defer wg.Done()
 	for {
 		select {
 		case <-ctx.Done():

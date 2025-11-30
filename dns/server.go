@@ -6,7 +6,9 @@ import (
 	"net"
 	"os"
 	"strings"
+	"sync"
 	"syscall"
+	"time"
 
 	"github.com/hyprspace/hyprspace/config"
 	"github.com/iguanesolutions/go-systemd/v5/resolved"
@@ -108,7 +110,9 @@ func writeResponse(msg *dns.Msg, q dns.Question, p peer.ID, addr net.IP) {
 	})
 }
 
-func MagicDnsServer(ctx context.Context, config config.Config, node host.Host) {
+func MagicDnsServer(ctx context.Context, wg *sync.WaitGroup, config config.Config, node host.Host) {
+	wg.Add(1)
+	defer wg.Done()
 	dns.HandleFunc(domainSuffix(config), func(w dns.ResponseWriter, r *dns.Msg) {
 		m := new(dns.Msg)
 		m.SetReply(r)
@@ -175,6 +179,7 @@ func MagicDnsServer(ctx context.Context, config config.Config, node host.Host) {
 		w.WriteMsg(m)
 	})
 
+	var servers = make([]*dns.Server, 0)
 	dnsServerAddrBytes := []byte{127, 80, 01, 53}
 	var dnsServerPort uint16 = 5380
 	for i, b := range []byte(config.Interface) {
@@ -194,6 +199,7 @@ func MagicDnsServer(ctx context.Context, config config.Config, node host.Host) {
 				fmt.Printf("[!] DNS server error: %s, %s\n", server.Net, err.Error())
 			}
 		}(sv)
+		servers = append(servers, sv)
 	}
 
 	conn, err := resolved.NewConn()
@@ -229,5 +235,11 @@ func MagicDnsServer(ctx context.Context, config config.Config, node host.Host) {
 			fmt.Println("[!] [dns] Failed to configure resolved:", err)
 			return
 		}
+	}
+
+	<-ctx.Done()
+	for _, s := range servers {
+		shutdownCtx, _ := context.WithDeadline(ctx, time.Now().Add(5*time.Second))
+		s.ShutdownContext(shutdownCtx)
 	}
 }

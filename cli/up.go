@@ -2,15 +2,18 @@ package cli
 
 import (
 	"context"
-	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/DataDrake/cli-ng/v2/cmd"
 	hsnode "github.com/hyprspace/hyprspace/node"
+	"github.com/ipfs/go-log/v2"
 )
+
+const InfoLogLevel = "info"
+
+var logger = log.Logger("hyprspace")
 
 // Up creates and brings up a Hyprspace Interface.
 var Up = cmd.Sub{
@@ -33,8 +36,11 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 		configPath = "/etc/hyprspace/" + ifName + ".json"
 	}
 
+	log.SetLogLevelRegex("hyprspace*", InfoLogLevel)
+
 	node := hsnode.New(context.Background(), configPath, ifName)
 	checkErr(node.Run())
+	logger.Info("hyprspace node running started")
 
 	exitCh := make(chan os.Signal, 1)
 	rebootstrapCh := make(chan os.Signal, 1)
@@ -44,13 +50,13 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 	for {
 		select {
 		case <-rebootstrapCh:
-			fmt.Println("[-] Rebootstrapping on SIGUSR1")
+			logger.Info("Rebootstrapping on SIGUSR1")
 			node.Rebootstrap()
 		case <-exitCh:
-			fmt.Println("[-] Shutting down...")
+			logger.Info("Shutting down...")
 			go func() {
 				<-exitCh
-				log.Fatal("Terminating immediately.")
+				logger.Fatal("Terminating immediately")
 			}()
 			checkErr(node.Stop())
 			os.Exit(0)

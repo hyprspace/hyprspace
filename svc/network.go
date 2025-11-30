@@ -8,13 +8,17 @@ import (
 	"github.com/hyprspace/hyprspace/config"
 	"github.com/hyprspace/hyprspace/netstack"
 	hstun "github.com/hyprspace/hyprspace/tun"
+	"github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p/core/host"
+	"go.uber.org/zap"
 	"golang.zx2c4.com/wireguard/tun"
 	"gvisor.dev/gvisor/pkg/tcpip"
 	"gvisor.dev/gvisor/pkg/tcpip/network/ipv6"
 )
 
 const Protocol = "/hyprspace/service/0.0.1"
+
+var logger = log.Logger("hyprspace/services")
 
 type ServiceNetwork struct {
 	host         host.Host
@@ -31,7 +35,7 @@ type ServiceNetwork struct {
 func (sn *ServiceNetwork) Register(serviceName string, proxy Proxy) {
 	svcId := config.MkServiceID(serviceName)
 	sn.listeners[svcId] = proxy
-	fmt.Printf("[-] Registered service \"%s\" [%x]: %s\n", serviceName, svcId, proxy.Description)
+	logger.With(zap.String("name", serviceName), zap.ByteString("id", svcId[:]), zap.String("description", proxy.Description)).Debug("Registered service")
 }
 
 func (sn *ServiceNetwork) EnsureListener(addr [16]byte, port uint16) bool {
@@ -50,7 +54,7 @@ func (sn *ServiceNetwork) EnsureListener(addr [16]byte, port uint16) bool {
 		if s, ok := sn.listeners[svcId]; ok {
 			proxy = s
 		} else {
-			fmt.Printf("[!] [svc] Unknown service: %x\n", addr[10:16])
+			logger.With(zap.ByteString("address", addr[10:16])).Warn("Unknown service")
 			return false
 		}
 	} else if p, ok := sn.config.PeerLookup.ByNetID[netId]; ok {
@@ -61,7 +65,7 @@ func (sn *ServiceNetwork) EnsureListener(addr [16]byte, port uint16) bool {
 		Port: int(port),
 	}
 	if registerAddr {
-		fmt.Printf("[-] [svc] Registering /ip6/%s\n", tcpAddr.IP)
+		logger.Debug(fmt.Sprintf("Registering /ip6/%s", tcpAddr.IP))
 		sn.netx.AddProtocolAddress(tcpip.ProtocolAddress{
 			Protocol:          ipv6.ProtocolNumber,
 			AddressWithPrefix: tcpip.AddrFrom16(addr).WithPrefix(),
@@ -77,7 +81,7 @@ func (sn *ServiceNetwork) EnsureListener(addr [16]byte, port uint16) bool {
 	}
 
 	go proxy.ServeFunc()(tcpL)
-	fmt.Printf("[-] [svc] Listening on /ip6/%s/tcp/%d\n", tcpAddr.IP, tcpAddr.Port)
+	logger.Debug(fmt.Sprintf("Listening on /ip6/%s/tcp/%d", tcpAddr.IP, tcpAddr.Port))
 	return true
 }
 
@@ -90,7 +94,7 @@ func NewServiceNetwork(host host.Host, cfg *config.Config, tunDev *hstun.TUN) Se
 		1420,
 	)
 	if err != nil {
-		panic(err)
+		logger.With(err).Fatal("Failed to Create tunnel device")
 	}
 
 	go func() {
@@ -112,7 +116,7 @@ func NewServiceNetwork(host host.Host, cfg *config.Config, tunDev *hstun.TUN) Se
 		}
 	}()
 
-	fmt.Println("[+] Service Network ready")
+	logger.Info("Service Network ready")
 
 	sn := ServiceNetwork{
 		host:   host,

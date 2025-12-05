@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"net/rpc"
+	"os"
 	"sync"
 	"syscall"
 
@@ -177,6 +178,11 @@ func RpcServer(ctx context.Context, wg *sync.WaitGroup, ma multiaddr.Multiaddr, 
 
 	var l net.Listener
 	oldUmask := syscall.Umask(0o007)
+
+	err = os.Remove(addr)
+	if err != nil && !os.IsNotExist(err) {
+		log.Fatal("[!] Could not remove old RPC socket: ", err)
+	}
 
 	var lc net.ListenConfig
 	l, err = lc.Listen(ctx, "unix", addr)

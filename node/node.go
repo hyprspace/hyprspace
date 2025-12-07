@@ -127,7 +127,6 @@ func (node *Node) Run() error {
 		return err
 	}
 
-	logger.Info("Creating PeX stream handler")
 	node.p2p.SetStreamHandler(p2p.PeXProtocol, p2p.NewPeXStreamHandler(node.p2p, node.cfg))
 
 	for _, p := range node.cfg.Peers {
@@ -190,8 +189,6 @@ func (node *Node) Run() error {
 			name,
 			proxy,
 		)
-		logger.With(zap.String("name", name), zap.String("addr", addr.String())).
-			Debug("Service registered")
 	}
 
 	var svcNetIds [][4]byte
@@ -266,7 +263,7 @@ func (node *Node) Run() error {
 						if serviceNet.EnsureListener([16]byte(packet[24:40]), port) {
 							count, err := (*serviceNet.Tun).Write([][]byte{packet}, 0)
 							if count == 0 || err != nil {
-								logger.With(err).Error("Failed writing to tunnel")
+								logger.With(err).Error("Error writing to service-network tunnel")
 							}
 						}
 					}

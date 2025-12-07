@@ -11,7 +11,6 @@ import (
 	"github.com/ipfs/go-log/v2"
 )
 
-const InfoLogLevel = "info"
 
 var logger = log.Logger("hyprspace")
 
@@ -36,11 +35,12 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 		configPath = "/etc/hyprspace/" + ifName + ".json"
 	}
 
-	log.SetLogLevelRegex("hyprspace*", InfoLogLevel)
+	log.SetLogLevel("hyprspace", "info")
+	log.SetLogLevelRegex("^hyprspace/", "info")
 
 	node := hsnode.New(context.Background(), configPath, ifName)
 	checkErr(node.Run())
-	logger.Info("hyprspace node running started")
+	logger.Info("Node ready")
 
 	exitCh := make(chan os.Signal, 1)
 	rebootstrapCh := make(chan os.Signal, 1)

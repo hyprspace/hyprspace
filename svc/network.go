@@ -18,7 +18,7 @@ import (
 
 const Protocol = "/hyprspace/service/0.0.1"
 
-var logger = log.Logger("hyprspace/services")
+var logger = log.Logger("hyprspace/svc")
 
 type ServiceNetwork struct {
 	host         host.Host
@@ -94,7 +94,7 @@ func NewServiceNetwork(host host.Host, cfg *config.Config, tunDev *hstun.TUN) Se
 		1420,
 	)
 	if err != nil {
-		logger.With(err).Fatal("Failed to Create tunnel device")
+		logger.With(err).Fatal("Failed to Create service-network tunnel device")
 	}
 
 	go func() {

@@ -10,7 +10,7 @@ import (
 func (sn *ServiceNetwork) streamHandler() func(network.Stream) {
 	return func(stream network.Stream) {
 		if _, ok := config.FindPeer(sn.config.Peers, stream.Conn().RemotePeer()); !ok {
-			logger.Debug("Could not find peer")
+			logger.Debug("Connection attempt from untrusted peer")
 			stream.Reset()
 			return
 		}

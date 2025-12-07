@@ -191,7 +191,7 @@ func RpcServer(ctx context.Context, wg *sync.WaitGroup, ma multiaddr.Multiaddr, 
 	syscall.Umask(oldUmask)
 
 	if err != nil {
-		logger.With(err).Fatal("Failed to launch RPC server ")
+		logger.With(err).Fatal("Failed to launch RPC server")
 	}
 
 	logger.Info("RPC server ready")

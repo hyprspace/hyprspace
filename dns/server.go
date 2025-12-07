@@ -198,14 +198,14 @@ func MagicDnsServer(ctx context.Context, wg *sync.WaitGroup, config config.Confi
 			Net:       netType,
 			ReusePort: true,
 		}
-		logger.With(zap.String("server_addr", dnsServerAddr.String()),
+		logger.With(zap.String("serverAddr", dnsServerAddr.String()),
 			zap.String("network", sv.Net),
 			zap.Int("port", int(dnsServerPort))).
 			Debug("Starting DNS server")
 
 		go func(server *dns.Server) {
 			if err := server.ListenAndServe(); err != nil {
-				logger.With(zap.String("server_net", server.Net)).With(err).Error("DNS server error")
+				logger.With(zap.String("serverNet", server.Net)).With(err).Error("DNS server error")
 			}
 		}(sv)
 		servers = append(servers, sv)

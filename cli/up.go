@@ -11,7 +11,6 @@ import (
 	"github.com/ipfs/go-log/v2"
 )
 
-
 var logger = log.Logger("hyprspace")
 
 // Up creates and brings up a Hyprspace Interface.

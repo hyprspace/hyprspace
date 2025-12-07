@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"net"
 	"net/rpc"
 	"os"
@@ -14,12 +13,15 @@ import (
 	"github.com/hyprspace/hyprspace/config"
 	"github.com/hyprspace/hyprspace/p2p"
 	"github.com/hyprspace/hyprspace/tun"
+	"github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/yl2chen/cidranger"
 )
+
+var logger = log.Logger("hyprspace/rpc")
 
 type HyprspaceRPC struct {
 	host   host.Host
@@ -173,7 +175,7 @@ func RpcServer(ctx context.Context, wg *sync.WaitGroup, ma multiaddr.Multiaddr, 
 
 	addr, err := ma.ValueForProtocol(multiaddr.P_UNIX)
 	if err != nil {
-		log.Fatal("[!] Failed to parse multiaddr: ", err)
+		logger.With(err).Fatal("Failed to parse multiaddr")
 	}
 
 	var l net.Listener
@@ -181,7 +183,7 @@ func RpcServer(ctx context.Context, wg *sync.WaitGroup, ma multiaddr.Multiaddr, 
 
 	err = os.Remove(addr)
 	if err != nil && !os.IsNotExist(err) {
-		log.Fatal("[!] Could not remove old RPC socket: ", err)
+		logger.Fatal("[!] Could not remove old RPC socket: ", err)
 	}
 
 	var lc net.ListenConfig
@@ -189,12 +191,12 @@ func RpcServer(ctx context.Context, wg *sync.WaitGroup, ma multiaddr.Multiaddr, 
 	syscall.Umask(oldUmask)
 
 	if err != nil {
-		log.Fatal("[!] Failed to launch RPC server: ", err)
+		logger.With(err).Fatal("Failed to launch RPC server")
 	}
 
-	fmt.Println("[-] RPC server ready")
+	logger.Info("RPC server ready")
 	defer l.Close()
 	go rpc.Accept(l)
 	<-ctx.Done()
-	fmt.Println("[-] Closing RPC server")
+	logger.Info("Closing RPC server")
 }

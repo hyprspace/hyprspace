@@ -2,11 +2,11 @@ package p2p
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
 	"github.com/hyprspace/hyprspace/config"
+	"github.com/ipfs/go-log/v2"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
@@ -15,6 +15,7 @@ import (
 )
 
 var discoverNow = make(chan bool)
+var logger = log.Logger("hyprspace/p2p")
 
 // Discover starts up a DHT based discovery system finding and adding nodes with the same rendezvous string.
 func Discover(ctx context.Context, wg *sync.WaitGroup, h host.Host, dht *dht.IpfsDHT, peers []config.Peer) {
@@ -24,6 +25,7 @@ func Discover(ctx context.Context, wg *sync.WaitGroup, h host.Host, dht *dht.Ipf
 
 	wg.Add(1)
 	defer wg.Done()
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -49,7 +51,7 @@ func Discover(ctx context.Context, wg *sync.WaitGroup, h host.Host, dht *dht.Ipf
 				}
 			}
 			if !connectedToAny {
-				fmt.Println("[!] Not connected to any peers, attempting to bootstrap again")
+				logger.Debug("Not connected to any peers, attempting to bootstrap again")
 				dht.Bootstrap(ctx)
 				dht.RefreshRoutingTable()
 				dur = time.Second * 10

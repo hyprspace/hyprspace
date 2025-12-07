@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"strings"
 	"sync"
 	"time"
@@ -29,7 +28,6 @@ const PeXProtocol = "/hyprspace/pex/0.0.1"
 func checkErrPeX(err error, stream network.Stream) bool {
 	if err != nil {
 		stream.Reset()
-		fmt.Println("[!] PeX:", err)
 		return true
 	}
 	return false
@@ -51,6 +49,7 @@ func NewPeXStreamHandler(host host.Host, cfg *config.Config) func(network.Stream
 		buf := bufio.NewReader(stream)
 		str, err := buf.ReadString('\n')
 		if checkErrPeX(err, stream) {
+			logger.With(err).Error("Failed to read from stream")
 			return
 		}
 		str = strings.TrimSuffix(str, "\n")
@@ -61,6 +60,7 @@ func NewPeXStreamHandler(host host.Host, cfg *config.Config) func(network.Stream
 					for _, a := range host.Peerstore().Addrs(p.ID) {
 						_, err := stream.Write([]byte(fmt.Sprintf("%s|%s\n", p.ID, a)))
 						if checkErrPeX(err, stream) {
+							logger.With(err).Error("Failed to write to stream")
 							return
 						}
 					}
@@ -115,20 +115,22 @@ func RequestPeX(ctx context.Context, host host.Host, peers []peer.ID) (addrInfos
 func PeXService(ctx context.Context, wg *sync.WaitGroup, host host.Host, cfg *config.Config) {
 	subCon, err := host.EventBus().Subscribe(new(event.EvtPeerConnectednessChanged))
 	if err != nil {
-		log.Fatal(err)
+		logger.With(err).Fatal("Failed to subscribe to EventBus")
 	}
-	fmt.Println("[-] PeX service ready")
+	logger.Info("PeX service ready")
 	wg.Add(1)
 	defer wg.Done()
 	for {
 		select {
 		case <-ctx.Done():
+			logger.Debug("Stopping Peer-Exchange service")
 			return
 		case ev := <-subCon.Out():
 			evt := ev.(event.EvtPeerConnectednessChanged)
 			for _, vpnPeer := range cfg.Peers {
 				if vpnPeer.ID == evt.Peer {
-					if evt.Connectedness == network.Connected {
+					switch evt.Connectedness {
+					case network.Connected:
 						go func() {
 							addrInfos, err := RequestPeX(ctx, host, []peer.ID{evt.Peer})
 							if err == nil {
@@ -138,7 +140,7 @@ func PeXService(ctx context.Context, wg *sync.WaitGroup, host host.Host, cfg *co
 								}
 							}
 						}()
-					} else if evt.Connectedness == network.NotConnected {
+					case network.NotConnected:
 						peers := []peer.ID{}
 						for _, p := range cfg.Peers {
 							peers = append(peers, p.ID)

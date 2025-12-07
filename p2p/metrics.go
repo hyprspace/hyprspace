@@ -2,8 +2,6 @@ package p2p
 
 import (
 	"context"
-	"fmt"
-	"log"
 	"sync"
 	"time"
 
@@ -17,9 +15,9 @@ import (
 func RouteMetricsService(ctx context.Context, wg *sync.WaitGroup, host host.Host, cfg *config.Config) {
 	subCon, err := host.EventBus().Subscribe(new(event.EvtPeerConnectednessChanged))
 	if err != nil {
-		log.Fatal(err)
+		logger.With(err).Fatal("Failed to subscribe eventbus")
 	}
-	fmt.Println("[-] Route metrics service ready")
+	logger.Debug("Route metrics service ready")
 	wg.Add(1)
 	defer wg.Done()
 	for {

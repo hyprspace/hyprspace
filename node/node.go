@@ -19,6 +19,7 @@ import (
 	hsrpc "github.com/hyprspace/hyprspace/rpc"
 	"github.com/hyprspace/hyprspace/svc"
 	"github.com/hyprspace/hyprspace/tun"
+	"github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-cidranger"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/event"
@@ -27,7 +28,10 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.uber.org/zap"
 )
+
+var logger = log.Logger("hyprspace/node")
 
 type SharedStream struct {
 	Stream *network.Stream
@@ -67,13 +71,14 @@ func (node *Node) Run() error {
 	// Read in configuration from file.
 	cfg2, err := config.Read(node.configPath)
 	if err != nil {
+		logger.With(err).Error("Failed to read config")
 		return err
 	}
 
 	cfg2.Interface = node.interfaceName
 	node.cfg = cfg2
 
-	fmt.Println("[+] Creating TUN Device")
+	logger.Info("Creating TUN Device")
 
 	// Create new TUN device
 	node.tunDev, err = tun.New(
@@ -83,14 +88,17 @@ func (node *Node) Run() error {
 		tun.MTU(1420),
 	)
 	if err != nil {
+		logger.With(err).Error("Failed to create TUN Device")
 		return err
 	}
 	allRoutes4, err := node.cfg.PeerLookup.ByRoute.CoveredNetworks(*cidranger.AllIPv4)
 	if err != nil {
+		logger.With(err).Error("Failed to lookup IPv4 peer-routes")
 		return err
 	}
 	allRoutes6, err := node.cfg.PeerLookup.ByRoute.CoveredNetworks(*cidranger.AllIPv6)
 	if err != nil {
+		logger.With(err).Error("Failed to lookup IPv6 peer-routes")
 		return err
 	}
 	var routeOpts []tun.Option
@@ -102,7 +110,7 @@ func (node *Node) Run() error {
 		routeOpts = append(routeOpts, tun.Route(r.Network()))
 	}
 
-	fmt.Println("[+] Creating LibP2P Node")
+	logger.Info("Creating LibP2P node")
 
 	// Create P2P Node
 	node.p2p, node.dht, err = p2p.CreateNode(
@@ -115,8 +123,10 @@ func (node *Node) Run() error {
 		node.cfg.Peers,
 	)
 	if err != nil {
+		logger.With(err).Error("Failed to create Libp2p node")
 		return err
 	}
+
 	node.p2p.SetStreamHandler(p2p.PeXProtocol, p2p.NewPeXStreamHandler(node.p2p, node.cfg))
 
 	for _, p := range node.cfg.Peers {
@@ -125,7 +135,7 @@ func (node *Node) Run() error {
 
 	node.wg = &sync.WaitGroup{}
 
-	fmt.Println("[+] Setting Up Node Discovery via DHT")
+	logger.Debug("Setting up Node discovery via DHT")
 
 	// Setup P2P Discovery
 	go p2p.Discover(node.ctx, node.wg, node.p2p, node.dht, node.cfg.Peers)
@@ -133,21 +143,26 @@ func (node *Node) Run() error {
 	// Configure path for lock
 	node.lockPath = filepath.Join(filepath.Dir(node.cfg.Path), node.cfg.Interface+".lock")
 
+	logger.Debug("Starting Peer-Exchange service")
 	// PeX
 	go p2p.PeXService(node.ctx, node.wg, node.p2p, node.cfg)
 
+	logger.Debug("Starting Route Metrics service")
 	// Route metrics and latency
 	go p2p.RouteMetricsService(node.ctx, node.wg, node.p2p, node.cfg)
 
 	// Log about various events
 	err = node.eventLogger(node.ctx, node.p2p)
 	if err != nil {
+		logger.With(err).Error("Failed to subscribe to EventBus")
 		return err
 	}
 
+	logger.Debug("Starting RPC server")
 	// RPC server
 	go hsrpc.RpcServer(node.ctx, node.wg, multiaddr.StringCast(fmt.Sprintf("/unix/run/hyprspace-rpc.%s.sock", node.cfg.Interface)), node.p2p, *node.cfg, *node.tunDev)
 
+	logger.Debug("Starting DNS server")
 	// Magic DNS server
 	go hsdns.MagicDnsServer(node.ctx, node.wg, *node.cfg, node.p2p)
 
@@ -157,9 +172,10 @@ func (node *Node) Run() error {
 		metricsTuple := fmt.Sprintf("127.0.0.1:%s", metricsPort)
 		http.Handle("/metrics", promhttp.Handler())
 		go func() {
+			logger.Debug("Starting metrics API server")
 			http.ListenAndServe(metricsTuple, nil)
 		}()
-		fmt.Printf("[+] Listening for metrics scrape requests on http://%s/metrics\n", metricsTuple)
+		logger.Info(fmt.Sprintf("Listening for metrics scrape requests on http://%s/metrics", metricsTuple))
 	}
 
 	serviceNet := svc.NewServiceNetwork(node.p2p, node.cfg, node.tunDev)
@@ -192,22 +208,24 @@ func (node *Node) Run() error {
 	}
 
 	// Write lock to filesystem to indicate an existing running daemon.
-	err = os.WriteFile(node.lockPath, []byte(fmt.Sprint(os.Getpid())), os.ModePerm)
+	err = os.WriteFile(node.lockPath, fmt.Append(nil, os.Getpid()), os.ModePerm)
 	if err != nil {
 		return err
 	}
 
+	logger.Debug("Bringing up TUN device")
 	// Bring Up TUN Device
 	err = node.tunDev.Up()
 	if err != nil {
+		logger.With(err).Error("Failed to bring TUN device up")
 		return errors.New("unable to bring up tun device: " + err.Error())
 	}
 	err = node.tunDev.Apply(routeOpts...)
 	if err != nil {
-		return err
+		return errors.New("unable to apply routing options: " + err.Error())
 	}
 
-	fmt.Println("[+] Network setup complete")
+	logger.Info("Network setup complete")
 
 	// Initialize active streams map and packet byte array.
 	node.activeStreams = make(map[peer.ID]SharedStream)
@@ -217,12 +235,12 @@ func (node *Node) Run() error {
 			// Read in a packet from the tun device.
 			plen, err := node.tunDev.Iface.Read(packet)
 			if errors.Is(err, fs.ErrClosed) {
-				fmt.Println("[-] Interface closed")
+				logger.Warn("Interface closed")
 				<-node.ctx.Done()
 				time.Sleep(1 * time.Second)
 				return
 			} else if err != nil {
-				fmt.Println(err)
+				logger.With(err).Error("Failed to read from interface")
 				continue
 			}
 
@@ -244,8 +262,8 @@ func (node *Node) Run() error {
 						port := uint16(packet[42])*256 + uint16(packet[43])
 						if serviceNet.EnsureListener([16]byte(packet[24:40]), port) {
 							count, err := (*serviceNet.Tun).Write([][]byte{packet}, 0)
-							if count == 0 {
-								fmt.Printf("[!] To service network: %s\n", err)
+							if count == 0 || err != nil {
+								logger.With(err).Error("Error writing to service-network tunnel")
 							}
 						}
 					}
@@ -299,7 +317,7 @@ func (node *Node) streamHandler(stream network.Stream) {
 		}
 		err = stream.SetWriteDeadline(time.Now().Add(25 * time.Second))
 		if err != nil {
-			fmt.Println("[!] Failed to set write deadline: " + err.Error())
+			logger.With(err).Error("Failed to set write deadline")
 			stream.Close()
 			return
 		}
@@ -340,13 +358,13 @@ func (node *Node) sendPacket(dst peer.ID, packet []byte, plen int) {
 
 	stream, err := node.p2p.NewStream(node.ctx, dst, p2p.Protocol)
 	if err != nil {
-		fmt.Println("[!] Failed to open stream to " + dst.String() + ": " + err.Error())
+		logger.With(zap.String("destination", dst.String()), zap.Error(err)).Error("Failed to open stream")
 		go p2p.Rediscover()
 		return
 	}
 	err = stream.SetWriteDeadline(time.Now().Add(25 * time.Second))
 	if err != nil {
-		fmt.Println("[!] Failed to set write deadline: " + err.Error())
+		logger.With(err).Error("Failed to set write deadline")
 		stream.Close()
 		return
 	}
@@ -386,12 +404,13 @@ func (node *Node) eventLogger(ctx context.Context, host host.Host) error {
 				evt := ev.(event.EvtPeerConnectednessChanged)
 				for _, vpnPeer := range node.cfg.Peers {
 					if vpnPeer.ID == evt.Peer {
-						if evt.Connectedness == network.Connected {
+						switch evt.Connectedness {
+						case network.Connected:
 							for _, c := range host.Network().ConnsToPeer(evt.Peer) {
-								fmt.Printf("[+] Connected to %s/p2p/%s\n", c.RemoteMultiaddr().String(), evt.Peer.String())
+								logger.Info(fmt.Sprintf("Connected to %s/p2p/%s", c.RemoteMultiaddr().String(), evt.Peer.String()))
 							}
-						} else if evt.Connectedness == network.NotConnected {
-							fmt.Printf("[!] Disconnected from %s\n", evt.Peer.String())
+						case network.NotConnected:
+							logger.Info(fmt.Sprintf("Disconnected from %s", evt.Peer.String()))
 						}
 						break
 					}
@@ -419,7 +438,7 @@ func (node *Node) Stop() error {
 		return err
 	}
 
-	fmt.Println("Received signal, shutting down...")
+	logger.Info("Received signal, shutting down...")
 
 	err = node.tunDev.Down()
 	if err != nil {

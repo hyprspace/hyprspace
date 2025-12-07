@@ -3,7 +3,6 @@ package p2p
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"math/rand"
 	"net/http"
@@ -30,6 +29,7 @@ import (
 	libp2pquic "github.com/libp2p/go-libp2p/p2p/transport/quic"
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
 	ma "github.com/multiformats/go-multiaddr"
+	"go.uber.org/zap"
 )
 
 var (
@@ -110,13 +110,15 @@ func getExtraBootstrapNodes(addr ma.Multiaddr) (nodesList []string) {
 
 // CreateNode creates an internal Libp2p nodes and returns it and it's DHT Discovery service.
 func CreateNode(ctx context.Context, privateKey crypto.PrivKey, listenAddreses []ma.Multiaddr, handler network.StreamHandler, acl relay.ACLFilter, gater connmgr.ConnectionGater, vpnPeers []config.Peer) (node host.Host, dhtOut *dht.IpfsDHT, err error) {
+
 	maybePrivateNet := libp2p.ChainOptions()
 	swarmKeyFile, ok := os.LookupEnv("HYPRSPACE_SWARM_KEY")
 	if ok {
-		fmt.Println("[+] Using swarm key " + swarmKeyFile)
+		logger.With(zap.String("key", swarmKeyFile)).Info("Using swarm key")
 		var swarmKey *os.File
 		swarmKey, err = os.Open(swarmKeyFile)
 		if err != nil {
+			logger.With(err).Error("Failed to open swarm key-file")
 			return
 		}
 		defer swarmKey.Close()
@@ -126,6 +128,7 @@ func CreateNode(ctx context.Context, privateKey crypto.PrivKey, listenAddreses [
 
 	peerChan := make(chan peer.AddrInfo)
 
+	logger.Debug("Creating libp2p node")
 	// Create libp2p node
 	basicHost, err := libp2p.New(
 		maybePrivateNet,
@@ -208,11 +211,12 @@ func CreateNode(ctx context.Context, privateKey crypto.PrivKey, listenAddreses [
 	if ok {
 		ipfsApiAddr, err := ma.NewMultiaddr(ipfsApiStr)
 		if err == nil {
-			fmt.Println("[+] Getting additional peers from IPFS API")
+			logger.Debug("Getting additional peers from IPFS API")
 			extraPeers, err := parsePeerAddrs(getExtraPeers(ipfsApiAddr))
 			if err == nil {
-				fmt.Printf("[+] %d additional addresses\n", len(extraPeers))
+				logger.With(zap.Int("addresses", len(extraPeers))).Debug("Additional addresses found")
 				for _, p := range extraPeers {
+					logger.With(zap.String("id", p.ID.String()), zap.Int("addresses", len(p.Addrs))).Debug("Adding peer")
 					basicHost.Peerstore().AddAddrs(p.ID, p.Addrs, 5*time.Minute)
 				}
 			}
@@ -231,9 +235,9 @@ func CreateNode(ctx context.Context, privateKey crypto.PrivKey, listenAddreses [
 			if ok {
 				ipfsApiAddr, err := ma.NewMultiaddr(ipfsApiStr)
 				if err == nil {
-					fmt.Println("[+] Getting additional bootstrap nodes from IPFS API")
+					logger.Debug("Getting additional bootstrap nodes from IPFS API")
 					extraBootstrapNodes = getExtraBootstrapNodes(ipfsApiAddr)
-					fmt.Printf("[+] %d additional bootstrap nodes\n", len(extraBootstrapNodes))
+					logger.With(zap.Int("nodes", len(extraBootstrapNodes))).Debug("Found additional bootstrap nodes")
 				}
 			}
 			dynamicBootstrapPeers, err := parsePeerAddrs(extraBootstrapNodes)

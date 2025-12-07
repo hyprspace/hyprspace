@@ -10,6 +10,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
+	"go.uber.org/zap"
 )
 
 type Proxy struct {
@@ -79,22 +80,22 @@ func RemoteServiceProxy(host host.Host, p peer.ID, svcId [2]byte) Proxy {
 			stream, err := host.NewStream(ctx, p, Protocol)
 			defer conn.Close()
 			if err != nil {
-				fmt.Printf("[!] [svc] %s\n", err)
+				logger.With(err).Error("Failed to open new stream")
 				return
 			}
 			defer stream.Close()
 			_, err = stream.Write(svcId[:])
 			if err != nil {
-				fmt.Printf("[!] [svc] %s\n", err)
+				logger.With(err).Error("Failed to write to stream")
 				return
 			}
 			buf := make([]byte, 1)
 			_, err = stream.Read(buf)
 			if err != nil {
-				fmt.Printf("[!] [svc] %s\n", err)
+				logger.With(err).Error("Failed to read from stream")
 				return
 			} else if buf[0] != byte(RS_OK) {
-				fmt.Printf("[!] [svc] Peer %s does not support service %x\n", p, svcId)
+				logger.With(zap.String("peer", p.String()), zap.ByteString("service", svcId[:])).Warn("Peer does not support service")
 				return
 			}
 			pipe(conn, stream)
@@ -109,7 +110,7 @@ func TCPServiceProxy(tcpAddr net.TCPAddr) Proxy {
 			stream, err := net.DialTCP("tcp", nil, &tcpAddr)
 			defer conn.Close()
 			if err != nil {
-				fmt.Printf("[!] [svc] %s\n", err)
+				logger.With(zap.String("address", tcpAddr.String())).With(err).Error("Failed to Dial")
 				return
 			}
 			defer stream.Close()

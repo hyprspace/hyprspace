@@ -12,12 +12,16 @@ import (
 
 	"github.com/hyprspace/hyprspace/config"
 	"github.com/iguanesolutions/go-systemd/v5/resolved"
+	"github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/miekg/dns"
 	"github.com/multiformats/go-multibase"
 	"github.com/vishvananda/netlink"
+	"go.uber.org/zap"
 )
+
+var logger = log.Logger("hyprspace/dns")
 
 func domainSuffix(config config.Config) string {
 	if config.Interface == "hyprspace" {
@@ -113,6 +117,7 @@ func writeResponse(msg *dns.Msg, q dns.Question, p peer.ID, addr net.IP) {
 func MagicDnsServer(ctx context.Context, wg *sync.WaitGroup, config config.Config, node host.Host) {
 	wg.Add(1)
 	defer wg.Done()
+
 	dns.HandleFunc(domainSuffix(config), func(w dns.ResponseWriter, r *dns.Msg) {
 		m := new(dns.Msg)
 		m.SetReply(r)
@@ -154,7 +159,7 @@ func MagicDnsServer(ctx context.Context, wg *sync.WaitGroup, config config.Confi
 				} else {
 					hostname, err := os.Hostname()
 					if err != nil {
-						fmt.Println("[!] [dns] " + err.Error())
+						logger.With(err).Error("Failed to get hostname")
 					}
 
 					qName := strings.ToLower(qNodeName)
@@ -193,10 +198,14 @@ func MagicDnsServer(ctx context.Context, wg *sync.WaitGroup, config config.Confi
 			Net:       netType,
 			ReusePort: true,
 		}
-		fmt.Printf("[-] Starting DNS server on /ip4/%s/%s/%d\n", dnsServerAddr, sv.Net, dnsServerPort)
+		logger.With(zap.String("serverAddr", dnsServerAddr.String()),
+			zap.String("network", sv.Net),
+			zap.Int("port", int(dnsServerPort))).
+			Debug("Starting DNS server")
+
 		go func(server *dns.Server) {
 			if err := server.ListenAndServe(); err != nil {
-				fmt.Printf("[!] DNS server error: %s, %s\n", server.Net, err.Error())
+				logger.With(zap.String("serverNet", server.Net)).With(err).Error("DNS server error")
 			}
 		}(sv)
 		servers = append(servers, sv)
@@ -204,14 +213,14 @@ func MagicDnsServer(ctx context.Context, wg *sync.WaitGroup, config config.Confi
 
 	conn, err := resolved.NewConn()
 	if err != nil {
-		fmt.Println("[!] [dns] Failed to connect to D-Bus:", err)
+		logger.With(err).Error("Failed to connect to D-Bus")
 		return
 	}
 	defer conn.Close()
 
 	link, err := netlink.LinkByName(config.Interface)
 	if err != nil {
-		fmt.Println("[!] [dns] Failed to get link ID:", err)
+		logger.With(err).Error("Failed to get link ID")
 		return
 	}
 	linkID := link.Attrs().Index
@@ -232,7 +241,7 @@ func MagicDnsServer(ctx context.Context, wg *sync.WaitGroup, config config.Confi
 		},
 	} {
 		if err := f(); err != nil {
-			fmt.Println("[!] [dns] Failed to configure resolved:", err)
+			logger.With(err).Error("Failed to configure resolved")
 			return
 		}
 	}

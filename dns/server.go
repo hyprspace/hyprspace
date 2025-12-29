@@ -239,6 +239,18 @@ func MagicDnsServer(ctx context.Context, wg *sync.WaitGroup, config config.Confi
 				RoutingDomain: false,
 			}})
 		},
+		func() error {
+			return conn.SetLinkDNSSEC(ctx, linkID, "no")
+		},
+		func() error {
+			return conn.SetLinkDNSOverTLS(ctx, linkID, "no")
+		},
+		func() error {
+			return conn.SetLinkLLMNR(ctx, linkID, "no")
+		},
+		func() error {
+			return conn.SetLinkMulticastDNS(ctx, linkID, "no")
+		},
 	} {
 		if err := f(); err != nil {
 			logger.With(err).Error("Failed to configure resolved")

@@ -69,8 +69,9 @@ func ProxyTo(ma multiaddr.Multiaddr) (Proxy, error) {
 type RemoteServiceProxyStatus byte
 
 const (
-	RS_OK            RemoteServiceProxyStatus = 0xf1
-	RS_NOT_SUPPORTED RemoteServiceProxyStatus = 0xf2
+	RS_OK             RemoteServiceProxyStatus = 0xf1
+	RS_NOT_SUPPORTED  RemoteServiceProxyStatus = 0xf2
+	RS_NOT_AUTHORIZED RemoteServiceProxyStatus = 0xf3
 )
 
 func RemoteServiceProxy(host host.Host, p peer.ID, svcId [2]byte) Proxy {

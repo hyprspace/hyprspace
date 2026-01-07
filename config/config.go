@@ -27,7 +27,7 @@ type Config struct {
 	BuiltinAddr4    net.IP                         `json:"-"`
 	BuiltinAddr6    net.IP                         `json:"-"`
 	Services        map[string]multiaddr.Multiaddr `json:"-"`
-	ServicesACL     map[string]ServiceACL          `json:"-"`
+	ServicesACL     map[string]ServiceACLList      `json:"-"`
 }
 
 // Peer defines a peer in the configuration. We might add more to this later.
@@ -56,6 +56,11 @@ type RouteTableEntry struct {
 type ServiceACL struct {
 	Whitelist map[peer.ID]interface{}
 	Blacklist map[peer.ID]interface{}
+}
+
+type ServiceACLList struct {
+	Whitelist []peer.ID
+	Blacklist []peer.ID
 }
 
 func (rte RouteTableEntry) Network() net.IPNet {

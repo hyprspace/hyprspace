@@ -10,6 +10,7 @@ import (
 	hstun "github.com/hyprspace/hyprspace/tun"
 	"github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"go.uber.org/zap"
 	"golang.zx2c4.com/wireguard/tun"
 	"gvisor.dev/gvisor/pkg/tcpip"
@@ -33,10 +34,27 @@ type ServiceNetwork struct {
 	acl          map[[2]byte]config.ServiceACL
 }
 
+func parseACL(configACL config.ServiceACLList) config.ServiceACL {
+	acl := config.ServiceACL{}
+	if configACL.Blacklist != nil {
+		acl.Blacklist = make(map[peer.ID]interface{})
+		for _, blackListedPeer := range configACL.Blacklist {
+			acl.Blacklist[blackListedPeer] = nil
+		}
+	}
+	if configACL.Whitelist != nil {
+		acl.Whitelist = make(map[peer.ID]interface{})
+		for _, whitelistedPeer := range configACL.Whitelist {
+			acl.Whitelist[whitelistedPeer] = nil
+		}
+	}
+	return acl
+}
+
 func (sn *ServiceNetwork) Register(serviceName string, proxy Proxy) {
 	svcId := config.MkServiceID(serviceName)
 	sn.listeners[svcId] = proxy
-	sn.acl[svcId] = sn.config.ServicesACL[serviceName]
+	sn.acl[svcId] = parseACL(sn.config.ServicesACL[serviceName])
 	logger.With(zap.String("name", serviceName), zap.ByteString("id", svcId[:]), zap.String("description", proxy.Description)).Debug("Registered service")
 }
 

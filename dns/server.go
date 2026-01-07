@@ -7,17 +7,14 @@ import (
 	"os"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/hyprspace/hyprspace/config"
-	"github.com/iguanesolutions/go-systemd/v5/resolved"
 	"github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/miekg/dns"
 	"github.com/multiformats/go-multibase"
-	"github.com/vishvananda/netlink"
 	"go.uber.org/zap"
 )
 
@@ -211,51 +208,8 @@ func MagicDnsServer(ctx context.Context, wg *sync.WaitGroup, config config.Confi
 		servers = append(servers, sv)
 	}
 
-	conn, err := resolved.NewConn()
-	if err != nil {
-		logger.With(err).Error("Failed to connect to D-Bus")
-		return
-	}
-	defer conn.Close()
-
-	link, err := netlink.LinkByName(config.Interface)
-	if err != nil {
-		logger.With(err).Error("Failed to get link ID")
-		return
-	}
-	linkID := link.Attrs().Index
-
-	for _, f := range [](func() error){
-		func() error {
-			return conn.SetLinkDNSEx(ctx, linkID, []resolved.LinkDNSEx{{
-				Family:  syscall.AF_INET,
-				Address: dnsServerAddrBytes,
-				Port:    dnsServerPort,
-			}})
-		},
-		func() error {
-			return conn.SetLinkDomains(ctx, linkID, []resolved.LinkDomain{{
-				Domain:        domainSuffix(config),
-				RoutingDomain: false,
-			}})
-		},
-		func() error {
-			return conn.SetLinkDNSSEC(ctx, linkID, "no")
-		},
-		func() error {
-			return conn.SetLinkDNSOverTLS(ctx, linkID, "no")
-		},
-		func() error {
-			return conn.SetLinkLLMNR(ctx, linkID, "no")
-		},
-		func() error {
-			return conn.SetLinkMulticastDNS(ctx, linkID, "no")
-		},
-	} {
-		if err := f(); err != nil {
-			logger.With(err).Error("Failed to configure resolved")
-			return
-		}
+	if err := configureSystemdResolved(ctx, config, dnsServerAddrBytes, dnsServerPort); err != nil {
+		logger.With(err).Warn("Failed to configure system resolver")
 	}
 
 	<-ctx.Done()

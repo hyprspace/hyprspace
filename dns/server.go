@@ -201,7 +201,7 @@ func MagicDnsServer(ctx context.Context, wg *sync.WaitGroup, config config.Confi
 		logger.With(zap.String("serverAddr", dnsServerAddr.String()),
 			zap.String("network", sv.Net),
 			zap.Int("port", int(dnsServerPort))).
-			Debug("Starting DNS server")
+			Info("Starting DNS server")
 
 		go func(server *dns.Server) {
 			if err := server.ListenAndServe(); err != nil {

@@ -96,7 +96,7 @@ func RemoteServiceProxy(host host.Host, p peer.ID, svcId [2]byte) Proxy {
 				logger.With(err).Error("Failed to read from stream")
 				return
 			} else if buf[0] != byte(RS_OK) {
-				logger.With(zap.String("peer", p.String()), zap.ByteString("service", svcId[:])).Warn("Peer does not support service")
+				logger.With(zap.String("peer", p.String()), zap.String("service", fmt.Sprintf("%x", svcId[:]))).Warn("Peer does not support service")
 				return
 			}
 			pipe(conn, stream)

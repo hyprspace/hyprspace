@@ -45,7 +45,7 @@ func (sn *ServiceNetwork) streamHandler() func(network.Stream) {
 		if proxy, ok := sn.listeners[svcId]; ok {
 			remotePeer := stream.Conn().RemotePeer()
 			if sn.isRemoteBlocked(svcId, remotePeer) {
-				logger.With(zap.ByteString("service ID", svcId[:])).Warn("Connection from non-allowed peer")
+				logger.With(zap.String("service ID", fmt.Sprintf("%x", svcId[:]))).Debug("Connection from non-allowed peer")
 				_, err := stream.Write([]byte{byte(RS_NOT_AUTHORIZED)})
 				if err != nil {
 					logger.With(err).Error("Failed to send RS_NOT_AUTHORIZED")

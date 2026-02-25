@@ -39,14 +39,16 @@ func parseACL(configACL config.ServiceACLList) config.ServiceACL {
 	if configACL.Blacklist != nil {
 		acl.Blacklist = make(map[peer.ID]interface{})
 		for _, blackListedPeer := range configACL.Blacklist {
-			acl.Blacklist[blackListedPeer] = nil
+			acl.Blacklist[blackListedPeer] = struct{}{}
 		}
+		logger.Debug("Blacklist configured")
 	}
 	if configACL.Whitelist != nil {
 		acl.Whitelist = make(map[peer.ID]interface{})
 		for _, whitelistedPeer := range configACL.Whitelist {
-			acl.Whitelist[whitelistedPeer] = nil
+			acl.Whitelist[whitelistedPeer] = struct{}{}
 		}
+		logger.Debug("Whitelist configured")
 	}
 	return acl
 }
@@ -55,7 +57,7 @@ func (sn *ServiceNetwork) Register(serviceName string, proxy Proxy) {
 	svcId := config.MkServiceID(serviceName)
 	sn.listeners[svcId] = proxy
 	sn.acl[svcId] = parseACL(sn.config.ServicesACL[serviceName])
-	logger.With(zap.String("name", serviceName), zap.ByteString("id", svcId[:]), zap.String("description", proxy.Description)).Debug("Registered service")
+	logger.With(zap.String("name", serviceName), zap.String("id", fmt.Sprintf("%x", svcId[:])), zap.String("description", proxy.Description)).Info("Registered service")
 }
 
 func (sn *ServiceNetwork) EnsureListener(addr [16]byte, port uint16) bool {
@@ -151,6 +153,7 @@ func NewServiceNetwork(host host.Host, cfg *config.Config, tunDev *hstun.TUN) Se
 		activeAddrs: make(map[[16]byte]struct{}),
 		activePorts: make(map[[16]byte]map[uint16]struct{}),
 		listeners:   make(map[[2]byte]Proxy),
+		acl:         make(map[[2]byte]config.ServiceACL),
 	}
 
 	host.SetStreamHandler(Protocol, sn.streamHandler())

@@ -27,7 +27,7 @@ type Config struct {
 	BuiltinAddr4    net.IP                         `json:"-"`
 	BuiltinAddr6    net.IP                         `json:"-"`
 	Services        map[string]multiaddr.Multiaddr `json:"-"`
-	ServicesACL     map[string]ServiceACLList      `json:"-"`
+	ServicesACL     map[string]ServiceACLList      `json:"acls"`
 }
 
 // Peer defines a peer in the configuration. We might add more to this later.
@@ -59,8 +59,8 @@ type ServiceACL struct {
 }
 
 type ServiceACLList struct {
-	Whitelist []peer.ID
-	Blacklist []peer.ID
+	Whitelist []peer.ID `json:"whitelist"`
+	Blacklist []peer.ID `json:"blacklist"`
 }
 
 func (rte RouteTableEntry) Network() net.IPNet {
@@ -165,6 +165,31 @@ func Read(path string) (*Config, error) {
 			return nil, err
 		}
 		result.Services[name] = addr
+	}
+
+	result.ServicesACL = make(map[string]ServiceACLList)
+	for service, acls := range input.Acls {
+		whitelist := make([]peer.ID, len(acls.Whitelist))
+		blacklist := make([]peer.ID, len(acls.Blacklist))
+		for i, peerIDString := range acls.Whitelist {
+			peerID, err := peer.Decode(peerIDString)
+			if err != nil {
+				return nil, err
+			}
+			whitelist[i] = peerID
+		}
+
+		for i, peerIDString := range acls.Blacklist {
+			peerID, err := peer.Decode(peerIDString)
+			if err != nil {
+				return nil, err
+			}
+			blacklist[i] = peerID
+		}
+		result.ServicesACL[service] = ServiceACLList{
+			Whitelist: whitelist,
+			Blacklist: blacklist,
+		}
 	}
 
 	// Overwrite path of config to input.

@@ -90,5 +90,20 @@ in
         "gameserver" = "/ip4/10.0.0.2/tcp/27015";
       };
     };
+
+    acls = mkOption {
+      type = types.attrsOf (
+        types.submodule {
+          options = {
+            whitelist = mkOption {
+              type = types.listOf types.str;
+            };
+            blacklist = mkOption {
+              type = types.listOf types.str;
+            };
+          };
+        }
+      );
+    };
   };
 }

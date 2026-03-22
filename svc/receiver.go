@@ -10,21 +10,10 @@ import (
 )
 
 func (sn *ServiceNetwork) isRemoteBlocked(svcId [2]byte, remotePeer peer.ID) bool {
-	if _, ok := sn.acl[svcId]; ok {
-		isBlacklisted := false // without blacklist it's NOT-blacklisted by default
-		isWhitelisted := true  // without whitelist it IS whitelisted by default
-		if sn.acl[svcId].Blacklist != nil {
-			_, isBlacklisted = sn.acl[svcId].Blacklist[remotePeer]
-			if isBlacklisted {
-				return true
-			}
-		}
-		if sn.acl[svcId].Whitelist != nil {
-			_, isWhitelisted = sn.acl[svcId].Whitelist[remotePeer]
-		}
-		return isBlacklisted || !isWhitelisted
-	}
-	return false
+	sv := sn.services[svcId]
+	_, isWhitelisted := sv.Whitelist[remotePeer]
+	_, isBlacklisted := sv.Blacklist[remotePeer]
+	return isBlacklisted || (sv.EnableWhitelist && !isWhitelisted)
 }
 
 func (sn *ServiceNetwork) streamHandler() func(network.Stream) {

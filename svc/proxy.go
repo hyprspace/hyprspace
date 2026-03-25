@@ -69,8 +69,9 @@ func ProxyTo(ma multiaddr.Multiaddr) (Proxy, error) {
 type RemoteServiceProxyStatus byte
 
 const (
-	RS_OK            RemoteServiceProxyStatus = 0xf1
-	RS_NOT_SUPPORTED RemoteServiceProxyStatus = 0xf2
+	RS_OK             RemoteServiceProxyStatus = 0xf1
+	RS_NOT_SUPPORTED  RemoteServiceProxyStatus = 0xf2
+	RS_NOT_AUTHORIZED RemoteServiceProxyStatus = 0xf3
 )
 
 func RemoteServiceProxy(host host.Host, p peer.ID, svcId [2]byte) Proxy {
@@ -95,7 +96,7 @@ func RemoteServiceProxy(host host.Host, p peer.ID, svcId [2]byte) Proxy {
 				logger.With(err).Error("Failed to read from stream")
 				return
 			} else if buf[0] != byte(RS_OK) {
-				logger.With(zap.String("peer", p.String()), zap.ByteString("service", svcId[:])).Warn("Peer does not support service")
+				logger.With(zap.String("peer", p.String()), zap.String("service", fmt.Sprintf("%x", svcId[:]))).Warn("Peer does not support service")
 				return
 			}
 			pipe(conn, stream)

@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -18,15 +19,15 @@ import (
 
 // Config is the main Configuration Struct for Hyprspace.
 type Config struct {
-	Path            string                         `json:"-"`
-	Interface       string                         `json:"-"`
-	ListenAddresses []multiaddr.Multiaddr          `json:"-"`
-	Peers           []Peer                         `json:"peers"`
-	PeerLookup      PeerLookup                     `json:"-"`
-	PrivateKey      crypto.PrivKey                 `json:"-"`
-	BuiltinAddr4    net.IP                         `json:"-"`
-	BuiltinAddr6    net.IP                         `json:"-"`
-	Services        map[string]multiaddr.Multiaddr `json:"-"`
+	Path            string                `json:"-"`
+	Interface       string                `json:"-"`
+	ListenAddresses []multiaddr.Multiaddr `json:"-"`
+	Peers           []Peer                `json:"peers"`
+	PeerLookup      PeerLookup            `json:"-"`
+	PrivateKey      crypto.PrivKey        `json:"-"`
+	BuiltinAddr4    net.IP                `json:"-"`
+	BuiltinAddr6    net.IP                `json:"-"`
+	Services        map[string]Service    `json:"-"`
 }
 
 // Peer defines a peer in the configuration. We might add more to this later.
@@ -47,6 +48,17 @@ type PeerLookup struct {
 type RouteTableEntry struct {
 	Net    net.IPNet
 	Target Peer
+}
+
+// Service represents the configuration for a specific service provided by this node.
+// Whitelist and Blacklist allow fine granularity in access control.
+// If Blacklist is set, this will be evaluated first and any client id present in Blacklist will
+// have access denied. Whitelist is evaluated after.
+type Service struct {
+	Target          multiaddr.Multiaddr
+	EnableWhitelist bool
+	Whitelist       map[peer.ID]struct{}
+	Blacklist       map[peer.ID]struct{}
 }
 
 func (rte RouteTableEntry) Network() net.IPNet {
@@ -144,13 +156,34 @@ func Read(path string) (*Config, error) {
 		result.Peers[i] = p
 	}
 
-	result.Services = make(map[string]multiaddr.Multiaddr)
-	for name, addrString := range input.Services {
-		addr, err := multiaddr.NewMultiaddr(addrString)
+	result.Services = make(map[string]Service)
+	for name, service := range input.Services {
+		addr, err := multiaddr.NewMultiaddr(service.Target)
 		if err != nil {
 			return nil, err
 		}
-		result.Services[name] = addr
+		whitelist := make(map[peer.ID]struct{})
+		blacklist := make(map[peer.ID]struct{})
+		for _, p := range service.Acl.Whitelist {
+			cfgPeer, found := FindPeerByCLIRef(result.Peers, p)
+			if !found {
+				return nil, errors.New("unknown peer: " + p)
+			}
+			whitelist[cfgPeer.ID] = struct{}{}
+		}
+		for _, peerStr := range service.Acl.Blacklist {
+			cfgPeer, found := FindPeerByCLIRef(result.Peers, peerStr)
+			if !found {
+				return nil, errors.New("unknown peer: " + peerStr)
+			}
+			blacklist[cfgPeer.ID] = struct{}{}
+		}
+		result.Services[name] = Service{
+			Target:          addr,
+			EnableWhitelist: service.Acl.EnableWhitelist,
+			Whitelist:       whitelist,
+			Blacklist:       blacklist,
+		}
 	}
 
 	// Overwrite path of config to input.

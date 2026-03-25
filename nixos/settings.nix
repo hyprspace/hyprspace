@@ -1,7 +1,7 @@
 { lib, ... }:
 let
 
-  inherit (lib) types mkOption;
+  inherit (lib) types mkOption mkEnableOption;
 
   t = {
     multiAddr = types.strMatching "/.*[^/]" // {
@@ -39,6 +39,40 @@ let
           description = "Networks to route to this peer. (optional)";
           default = [ ];
           example = [ { net = "10.10.0.0/16"; } ];
+        };
+      };
+    };
+
+    service = types.submodule {
+      options = {
+        target = mkOption {
+          type = t.multiAddr;
+          description = "Target address.";
+          example = "/tcp/8080";
+        };
+
+        acl = {
+          enableWhitelist = mkEnableOption "whitelist enforcement";
+
+          whitelist = mkOption {
+            type = types.listOf types.str;
+            description = "List of peers that are allowed to connect.";
+            example = [
+              "12D3KooWQWiPeNvXFdHFTrustedPeer"
+              "@goodpeer"
+            ];
+            default = null;
+          };
+
+          blacklist = mkOption {
+            type = types.listOf types.str;
+            description = "List of peers that are explicitly not allowed to connect.";
+            example = [
+              "12D3KooWQWiPeNvXFdHFUntrustedPeer"
+              "@badpeer"
+            ];
+            default = null;
+          };
         };
       };
     };
@@ -82,12 +116,23 @@ in
     };
 
     services = mkOption {
-      type = types.attrsOf t.multiAddr;
+      type = types.attrsOf t.service;
       description = "The services this node provides via the Service Network.";
       default = { };
       example = {
-        "www-local" = "/tcp/8080";
-        "gameserver" = "/ip4/10.0.0.2/tcp/27015";
+        www-local = {
+          target = "/tcp/8080";
+        };
+        gameserver = {
+          target = "/ip4/10.0.0.2/tcp/27015";
+          acl = {
+            enableWhitelist = true;
+            whitelist = [
+              "@friend1"
+              "@friend2"
+            ];
+          };
+        };
       };
     };
   };

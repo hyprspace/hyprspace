@@ -180,8 +180,8 @@ func (node *Node) Run() error {
 
 	serviceNet := svc.NewServiceNetwork(node.p2p, node.cfg, node.tunDev)
 
-	for name, addr := range node.cfg.Services {
-		proxy, err := svc.ProxyTo(addr)
+	for name, service := range node.cfg.Services {
+		proxy, err := svc.ProxyTo(service.Target)
 		if err != nil {
 			return err
 		}

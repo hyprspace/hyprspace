@@ -30,12 +30,14 @@ type ServiceNetwork struct {
 	activeAddrs  map[[16]byte]struct{}
 	activePorts  map[[16]byte]map[uint16]struct{}
 	listeners    map[[2]byte]Proxy
+	services     map[[2]byte]config.Service
 }
 
 func (sn *ServiceNetwork) Register(serviceName string, proxy Proxy) {
 	svcId := config.MkServiceID(serviceName)
 	sn.listeners[svcId] = proxy
-	logger.With(zap.String("name", serviceName), zap.ByteString("id", svcId[:]), zap.String("description", proxy.Description)).Debug("Registered service")
+	sn.services[svcId] = sn.config.Services[serviceName]
+	logger.With(zap.String("name", serviceName), zap.String("id", fmt.Sprintf("%x", svcId[:])), zap.String("description", proxy.Description)).Info("Registered service")
 }
 
 func (sn *ServiceNetwork) EnsureListener(addr [16]byte, port uint16) bool {
@@ -131,6 +133,7 @@ func NewServiceNetwork(host host.Host, cfg *config.Config, tunDev *hstun.TUN) Se
 		activeAddrs: make(map[[16]byte]struct{}),
 		activePorts: make(map[[16]byte]map[uint16]struct{}),
 		listeners:   make(map[[2]byte]Proxy),
+		services:    make(map[[2]byte]config.Service),
 	}
 
 	host.SetStreamHandler(Protocol, sn.streamHandler())

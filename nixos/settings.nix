@@ -61,7 +61,7 @@ let
               "12D3KooWQWiPeNvXFdHFTrustedPeer"
               "@goodpeer"
             ];
-            default = null;
+            default = [ ];
           };
 
           blacklist = mkOption {
@@ -71,7 +71,7 @@ let
               "12D3KooWQWiPeNvXFdHFUntrustedPeer"
               "@badpeer"
             ];
-            default = null;
+            default = [ ];
           };
         };
       };

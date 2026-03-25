@@ -14,7 +14,7 @@ buildGoModule rec {
     rev = "v${version}";
     hash = "sha256-ffrP4L5cfK75Tw/xfcdXAwGUP8WLL+81ltBDb/P5Gwo=";
   };
-  
+
   env.GOWORK = "off";
 
   vendorHash = "sha256-mCOJ8GROrbNXH7CSLLMZj/4wTa65hscTt8RzIxzgG+A=";

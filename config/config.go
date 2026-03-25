@@ -194,7 +194,6 @@ func Read(path string) (*Config, error) {
 func FindPeer(peers []Peer, needle peer.ID) (*Peer, bool) {
 	for _, p := range peers {
 		if p.ID == needle {
-
 			return &p, true
 		}
 	}

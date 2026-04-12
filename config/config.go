@@ -19,15 +19,16 @@ import (
 
 // Config is the main Configuration Struct for Hyprspace.
 type Config struct {
-	Path            string                `json:"-"`
-	Interface       string                `json:"-"`
-	ListenAddresses []multiaddr.Multiaddr `json:"-"`
-	Peers           []Peer                `json:"peers"`
-	PeerLookup      PeerLookup            `json:"-"`
-	PrivateKey      crypto.PrivKey        `json:"-"`
-	BuiltinAddr4    net.IP                `json:"-"`
-	BuiltinAddr6    net.IP                `json:"-"`
-	Services        map[string]Service    `json:"-"`
+	Path                   string                `json:"-"`
+	Interface              string                `json:"-"`
+	ListenAddresses        []multiaddr.Multiaddr `json:"-"`
+	Peers                  []Peer                `json:"peers"`
+	PeerLookup             PeerLookup            `json:"-"`
+	PrivateKey             crypto.PrivKey        `json:"-"`
+	BuiltinAddr4           net.IP                `json:"-"`
+	BuiltinAddr6           net.IP                `json:"-"`
+	Services               map[string]Service    `json:"-"`
+	FilterPrivateAddresses bool                  `json:"-"`
 }
 
 // Peer defines a peer in the configuration. We might add more to this later.
@@ -79,6 +80,15 @@ func Read(path string) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// Parse extra fields not covered by the generated schema.
+	var extra struct {
+		FilterPrivateAddresses bool `json:"filterPrivateAddresses"`
+	}
+	if err := json.Unmarshal(in, &extra); err != nil {
+		return nil, err
+	}
+	result.FilterPrivateAddresses = extra.FilterPrivateAddresses
 
 	_, keyBytes, err := multibase.Decode(input.PrivateKey)
 	if err != nil {

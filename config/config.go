@@ -81,15 +81,6 @@ func Read(path string) (*Config, error) {
 		return nil, err
 	}
 
-	// Parse extra fields not covered by the generated schema.
-	var extra struct {
-		FilterPrivateAddresses bool `json:"filterPrivateAddresses"`
-	}
-	if err := json.Unmarshal(in, &extra); err != nil {
-		return nil, err
-	}
-	result.FilterPrivateAddresses = extra.FilterPrivateAddresses
-
 	_, keyBytes, err := multibase.Decode(input.PrivateKey)
 	if err != nil {
 		return nil, err
@@ -195,6 +186,8 @@ func Read(path string) (*Config, error) {
 			Blacklist:       blacklist,
 		}
 	}
+
+	result.FilterPrivateAddresses = input.FilterPrivateAddresses
 
 	// Overwrite path of config to input.
 	result.Path = path

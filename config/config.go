@@ -19,15 +19,16 @@ import (
 
 // Config is the main Configuration Struct for Hyprspace.
 type Config struct {
-	Path            string                `json:"-"`
-	Interface       string                `json:"-"`
-	ListenAddresses []multiaddr.Multiaddr `json:"-"`
-	Peers           []Peer                `json:"peers"`
-	PeerLookup      PeerLookup            `json:"-"`
-	PrivateKey      crypto.PrivKey        `json:"-"`
-	BuiltinAddr4    net.IP                `json:"-"`
-	BuiltinAddr6    net.IP                `json:"-"`
-	Services        map[string]Service    `json:"-"`
+	Path                   string                `json:"-"`
+	Interface              string                `json:"-"`
+	ListenAddresses        []multiaddr.Multiaddr `json:"-"`
+	Peers                  []Peer                `json:"peers"`
+	PeerLookup             PeerLookup            `json:"-"`
+	PrivateKey             crypto.PrivKey        `json:"-"`
+	BuiltinAddr4           net.IP                `json:"-"`
+	BuiltinAddr6           net.IP                `json:"-"`
+	Services               map[string]Service    `json:"-"`
+	FilterPrivateAddresses bool                  `json:"-"`
 }
 
 // Peer defines a peer in the configuration. We might add more to this later.
@@ -185,6 +186,8 @@ func Read(path string) (*Config, error) {
 			Blacklist:       blacklist,
 		}
 	}
+
+	result.FilterPrivateAddresses = input.FilterPrivateAddresses
 
 	// Overwrite path of config to input.
 	result.Path = path

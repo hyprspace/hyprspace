@@ -13,44 +13,50 @@ import (
 	routedhost "github.com/libp2p/go-libp2p/p2p/host/routed"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/vishvananda/netlink"
+	"github.com/yl2chen/cidranger"
 	"go.uber.org/zap"
 )
 
-// privateNetworks defines IP ranges that should be filtered when
-// FilterPrivateAddresses is enabled. This includes RFC1918 private
-// addresses, IPv4/IPv6 link-local, and loopback ranges.
-var privateNetworks = []*net.IPNet{
-	// RFC1918 private ranges
-	parseCIDR("10.0.0.0/8"),
-	parseCIDR("172.16.0.0/12"),
-	parseCIDR("192.168.0.0/16"),
-	// IPv4 link-local
-	parseCIDR("169.254.0.0/16"),
-	// IPv4 loopback
-	parseCIDR("127.0.0.0/8"),
-	// IPv6 link-local
-	parseCIDR("fe80::/10"),
-	// IPv6 loopback
-	parseCIDR("::1/128"),
-}
+// privateNetworks is a CIDR ranger containing IP ranges that should be
+// filtered when FilterPrivateAddresses is enabled. This includes RFC1918
+// private addresses, IPv4/IPv6 link-local, and loopback ranges.
+var privateNetworks = initializePrivateNetworks()
 
-func parseCIDR(s string) *net.IPNet {
-	_, n, err := net.ParseCIDR(s)
-	if err != nil {
-		panic("invalid CIDR in privateNetworks: " + s)
+func initializePrivateNetworks() cidranger.Ranger {
+	ranger := cidranger.NewPCTrieRanger()
+	privateNetworkCIDRs := []string{
+		// RFC1918 private ranges
+		"10.0.0.0/8",
+		"172.16.0.0/12",
+		"192.168.0.0/16",
+		// IPv4 link-local
+		"169.254.0.0/16",
+		// IPv4 loopback
+		"127.0.0.0/8",
+		// IPv6 link-local
+		"fe80::/10",
+		// IPv6 loopback
+		"::1/128",
 	}
-	return n
+
+	for _, cidr := range privateNetworkCIDRs {
+		_, n, err := net.ParseCIDR(cidr)
+		if err != nil {
+			panic("invalid CIDR in privateNetworks: " + cidr)
+		}
+		if err := ranger.Insert(cidranger.NewBasicRangerEntry(*n)); err != nil {
+			panic("failed to insert CIDR into privateNetworks: " + cidr)
+		}
+	}
+
+	return ranger
 }
 
 // isPrivateIP returns true if the given IP falls within any of the
 // private/link-local/loopback ranges defined in privateNetworks.
 func isPrivateIP(ip net.IP) bool {
-	for _, n := range privateNetworks {
-		if n.Contains(ip) {
-			return true
-		}
-	}
-	return false
+	contains, err := privateNetworks.Contains(ip)
+	return err == nil && contains
 }
 
 // isPrivateMultiaddr returns true if the multiaddr contains an IP

@@ -73,6 +73,13 @@
               generateSchemasProgram = config.apps.dev-generate-schemas.program;
             };
           };
+
+          checks = pkgs.lib.optionalAttrs (pkgs.stdenv.hostPlatform.system == "x86_64-linux") {
+            vm-test = import ./nixos/test.nix {
+              inherit pkgs;
+              self = inputs.self;
+            };
+          };
         };
     };
 }

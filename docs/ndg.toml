@@ -1,0 +1,5 @@
+input_dir = "content"
+title = "Hyprspace"
+
+[sidebar]
+group_by_dir = true

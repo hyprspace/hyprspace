@@ -233,7 +233,7 @@ func (node *Node) Run() error {
 
 	node.packetQueues = make(map[peer.ID]chan Packet)
 	for _, p := range node.cfg.Peers {
-		node.packetQueues[p.ID] = make(chan Packet, 100)
+		node.packetQueues[p.ID] = make(chan Packet, 1000)
 		logger.With(zap.String("peer", p.ID.String())).Warn("spawn sender")
 		go func() {
 			node.wg.Add(1)

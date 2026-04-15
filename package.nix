@@ -31,7 +31,7 @@ buildGoModule {
   ];
 
   postPatch = ''
-    ( set -x; ${generateSchemasProgram} )
+    ( set -x; ${lib.getExe generateSchemasProgram} )
   '';
 
   meta = {

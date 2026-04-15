@@ -38,12 +38,18 @@ type SharedStream struct {
 	Lock   *sync.Mutex
 }
 
+type Packet struct {
+	Data [1420]byte
+	Size int
+}
+
 type Node struct {
 	cfg           *config.Config
 	p2p           host.Host
 	dht           *dht.IpfsDHT
 	tunDev        *tun.TUN
 	activeStreams map[peer.ID]SharedStream
+	packetQueues  map[peer.ID]chan Packet
 	ctx           context.Context
 	cancel        func()
 	lockPath      string
@@ -225,15 +231,32 @@ func (node *Node) Run() error {
 		return errors.New("unable to apply routing options: " + err.Error())
 	}
 
+	node.packetQueues = make(map[peer.ID]chan Packet)
+	for _, p := range node.cfg.Peers {
+		node.packetQueues[p.ID] = make(chan Packet, 100)
+		logger.With(zap.String("peer", p.ID.String())).Warn("spawn sender")
+		go func() {
+			node.wg.Add(1)
+			for {
+				select {
+				case <-node.ctx.Done():
+					node.wg.Done()
+					return
+				case packet := <-node.packetQueues[p.ID]:
+					node.sendPacket(p.ID, packet.Data, packet.Size)
+				}
+			}
+		}()
+	}
 	logger.Info("Network setup complete")
 
 	// Initialize active streams map and packet byte array.
 	node.activeStreams = make(map[peer.ID]SharedStream)
 	go func() {
 		for {
-			var packet = make([]byte, 1420)
+			var packet [1420]byte
 			// Read in a packet from the tun device.
-			plen, err := node.tunDev.Iface.Read(packet)
+			plen, err := node.tunDev.Iface.Read(packet[:])
 			if errors.Is(err, fs.ErrClosed) {
 				logger.Warn("Interface closed")
 				<-node.ctx.Done()
@@ -261,7 +284,7 @@ func (node *Node) Run() error {
 					if packet[6] == 0x06 {
 						port := uint16(packet[42])*256 + uint16(packet[43])
 						if serviceNet.EnsureListener([16]byte(packet[24:40]), port) {
-							count, err := (*serviceNet.Tun).Write([][]byte{packet}, 0)
+							count, err := (*serviceNet.Tun).Write([][]byte{packet[:]}, 0)
 							if count == 0 || err != nil {
 								logger.With(err).Error("Error writing to service-network tunnel")
 							}
@@ -279,7 +302,13 @@ func (node *Node) Run() error {
 
 			if found {
 				dst = route.Target.ID
-				go node.sendPacket(dst, packet, plen)
+				select {
+				case node.packetQueues[dst] <- Packet{
+					Data: [1420]byte(packet),
+					Size: plen,
+				}:
+				default:
+				}
 			}
 		}
 	}()
@@ -334,7 +363,7 @@ func (node *Node) streamHandler(stream network.Stream) {
 	}
 }
 
-func (node *Node) sendPacket(dst peer.ID, packet []byte, plen int) {
+func (node *Node) sendPacket(dst peer.ID, packet [1420]byte, plen int) {
 	// Check if we already have an open connection to the destination peer.
 	ms, ok := node.activeStreams[dst]
 	if ok {

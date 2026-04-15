@@ -321,6 +321,15 @@ func (node *Node) streamHandler(stream network.Stream) {
 			stream.Close()
 			return
 		}
+
+		// reuse this stream for returning packets
+		_, ok := node.activeStreams[stream.Conn().RemotePeer()]
+		if !ok {
+			node.activeStreams[stream.Conn().RemotePeer()] = SharedStream{
+				Stream: &stream,
+				Lock:   &sync.Mutex{},
+			}
+		}
 		_, _ = node.tunDev.Iface.Write(packet[:size])
 	}
 }

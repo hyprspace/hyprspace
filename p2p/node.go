@@ -129,10 +129,19 @@ func CreateNode(ctx context.Context, privateKey crypto.PrivKey, listenAddreses [
 	peerChan := make(chan peer.AddrInfo)
 
 	logger.Debug("Creating libp2p node")
+
+	// Resolve unspecified listen addresses (0.0.0.0, ::) to concrete
+	// per-interface IPs, excluding tunnel devices to prevent advertising
+	// tunnel IPs via mDNS (VPN-over-VPN loop prevention).
+	resolved, err := resolveListenAddrs(listenAddreses)
+	if err != nil {
+		return
+	}
+
 	// Create libp2p node
 	basicHost, err := libp2p.New(
 		maybePrivateNet,
-		libp2p.ListenAddrs(listenAddreses...),
+		libp2p.ListenAddrs(resolved...),
 		libp2p.Identity(privateKey),
 		libp2p.UserAgent("hyprspace"),
 		libp2p.DefaultSecurity,

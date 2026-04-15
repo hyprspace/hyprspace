@@ -40,4 +40,6 @@ func StatusRun(r *cmd.Root, c *cmd.Sub) {
 	printListF(status.NetPeerAddrsCurrent, maybeColorMultiaddr)
 	fmt.Println("Addresses:")
 	printListF(status.ListenAddrs, maybeColorMultiaddr)
+	fmt.Println("Advertised addresses (mDNS):")
+	printListF(status.AdvertisedAddrs, maybeColorMultiaddr)
 }

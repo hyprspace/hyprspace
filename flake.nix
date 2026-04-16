@@ -16,6 +16,7 @@
     };
     ndg = {
       url = "github:feel-co/ndg";
+      inputs.nixpkgs.follows = "nixpkgs";
     };
   };
 

@@ -4,7 +4,7 @@
   perSystem =
     { config, pkgs, ... }:
     {
-      formatter = pkgs.nixfmt-rfc-style;
+      formatter = pkgs.nixfmt;
       checks =
         let
           inherit (lib.fileset) toSource fileFilter;

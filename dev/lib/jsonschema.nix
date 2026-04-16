@@ -99,13 +99,12 @@ rec {
       defaultText ? null,
     }:
     {
-      "$exportedModuleInfo" =
-        {
-          inherit path;
-        }
-        // lib.optionalAttrs (defaultText != null) {
-          inherit defaultText;
-        };
+      "$exportedModuleInfo" = {
+        inherit path;
+      }
+      // lib.optionalAttrs (defaultText != null) {
+        inherit defaultText;
+      };
     };
 
   # parses a set of evaluated nixos options to a jsonschema
@@ -234,7 +233,8 @@ rec {
       // {
         oneOf = [
           { type = "null"; }
-        ] ++ (lib.optional (!isExcludedOption nestedOption) (parseOption nestedOption));
+        ]
+        ++ (lib.optional (!isExcludedOption nestedOption) (parseOption nestedOption));
       }
     # parse bool
     else if

@@ -2,7 +2,7 @@
   lib,
   runCommand,
   nixosOptionsDoc,
-  emanote,
+  ndg,
   hyprspace,
 }:
 
@@ -15,18 +15,9 @@ let
   };
 in
 
-runCommand "hyprspace-docs-${hyprspace.version}"
-  {
-    src = ./content;
-    nativeBuildInputs = [ emanote ];
-  }
-  ''
-    unpackPhase
-    cd "$sourceRoot"
-
-    cp ${../hyprspace.png} ./favicon.png
-    cp ${./emanote-config.json} ./index.yaml
-    cat ${optionsDoc.optionsCommonMark} >> ./configuration.md
-    mkdir -p $out/share/www/hyprspace-docs
-    emanote -L . gen $out/share/www/hyprspace-docs
-  ''
+runCommand "hyprspace-docs-${hyprspace.version}" { } ''
+  ${ndg}/bin/ndg --config-file ${./ndg.toml} \
+      --config input_dir=${./content} \
+      --config output_dir=$out/share/www/hyprspace-docs \
+      --config module_options=${optionsDoc.optionsJSON}/share/doc/nixos/options.json
+''

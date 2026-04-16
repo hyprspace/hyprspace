@@ -14,6 +14,9 @@
         flake-parts.follows = "flake-parts";
       };
     };
+    ndg = {
+      url = "github:feel-co/ndg";
+    };
   };
 
   outputs =
@@ -49,14 +52,22 @@
       ];
 
       perSystem =
-        { config, pkgs, ... }:
+        {
+          config,
+          inputs',
+          pkgs,
+          ...
+        }:
         {
           packages = {
             default = config.packages.hyprspace;
             hyprspace = pkgs.callPackage ./package.nix {
               generateSchemasProgram = config.apps.dev-generate-schemas.program;
             };
-            docs = pkgs.callPackage ./docs/package.nix { hyprspace = config.packages.default; };
+            docs = pkgs.callPackage ./docs/package.nix {
+              hyprspace = config.packages.default;
+              inherit (inputs'.ndg.packages) ndg;
+            };
             vendor = pkgs.callPackage ./dev/vendor.nix {
               generateSchemasProgram = config.apps.dev-generate-schemas.program;
             };

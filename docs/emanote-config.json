@@ -1,8 +1,0 @@
-{
-  "template": {
-    "iconUrl": "${ema:homeUrl}favicon.png"
-  },
-  "page": {
-    "siteTitle": "Hyprspace"
-  }
-}

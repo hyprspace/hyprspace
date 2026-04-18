@@ -13,11 +13,17 @@ import (
 	"github.com/multiformats/go-multibase"
 )
 
+// InitFlags Contains flags for the init command.
+type InitFlags struct {
+	Name string `long:"name" desc:"Name to include in the suggested peer entry."`
+}
+
 // Init creates a configuration for a Hyprspace Interface.
 var Init = cmd.Sub{
 	Name:  "init",
 	Alias: "i",
 	Short: "Initialize An Interface Config",
+	Flags: &InitFlags{},
 	Run:   InitRun,
 }
 
@@ -70,9 +76,15 @@ func InitRun(r *cmd.Root, c *cmd.Sub) {
 	if err == nil {
 		fmt.Println("Add this entry to your other peers:")
 		fmt.Println("{")
-		hostname, err := os.Hostname()
-		if err == nil {
-			fmt.Printf("  \"name\": \"%s\",\n", hostname)
+		name := c.Flags.(*InitFlags).Name
+		if name == "" {
+			hostname, err := os.Hostname()
+			if err == nil {
+				name = hostname
+			}
+		}
+		if name != "" {
+			fmt.Printf("  \"name\": \"%s\",\n", name)
 		}
 		fmt.Printf("  \"id\": \"%s\"\n", peerId)
 		fmt.Println("}")

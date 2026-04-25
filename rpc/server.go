@@ -49,13 +49,20 @@ func (hsr *HyprspaceRPC) Status(args *Args, reply *StatusReply) error {
 	for _, ma := range hsr.host.Addrs() {
 		addrStrings = append(addrStrings, ma.String())
 	}
+	var advertisedAddrs []string
+	if ifaceAddrs, err := hsr.host.Network().InterfaceListenAddresses(); err == nil {
+		for _, ma := range ifaceAddrs {
+			advertisedAddrs = append(advertisedAddrs, ma.String())
+		}
+	}
 	*reply = StatusReply{
-		hsr.host.ID().String(),
-		len(hsr.host.Network().Conns()),
-		netPeersCurrent,
-		netPeerAddrsCurrent,
-		len(hsr.config.Peers),
-		addrStrings,
+		PeerID:              hsr.host.ID().String(),
+		SwarmPeersCurrent:   len(hsr.host.Network().Conns()),
+		NetPeersCurrent:     netPeersCurrent,
+		NetPeerAddrsCurrent: netPeerAddrsCurrent,
+		NetPeersMax:         len(hsr.config.Peers),
+		ListenAddrs:         addrStrings,
+		AdvertisedAddrs:     advertisedAddrs,
 	}
 	return nil
 }

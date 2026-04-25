@@ -137,8 +137,14 @@ func (node *Node) Run() error {
 
 	logger.Debug("Setting up Node discovery via DHT")
 
-	// Setup P2P Discovery
+	// Setup DHT Discovery
 	go p2p.Discover(node.ctx, node.wg, node.p2p, node.dht, node.cfg.Peers)
+
+	// Setup mDNS Discovery for LAN peers
+	err = p2p.SetupMDNS(node.p2p, node.cfg.Peers)
+	if err != nil {
+		logger.With(err).Warn("Failed to start mDNS discovery")
+	}
 
 	// Configure path for lock
 	node.lockPath = filepath.Join(filepath.Dir(node.cfg.Path), node.cfg.Interface+".lock")

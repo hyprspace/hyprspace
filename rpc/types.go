@@ -16,6 +16,7 @@ type StatusReply struct {
 	NetPeerAddrsCurrent []string
 	NetPeersMax         int
 	ListenAddrs         []string
+	AdvertisedAddrs     []string // addresses broadcast via mDNS (resolved from listen addrs)
 }
 
 type PeersReply struct {

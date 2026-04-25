@@ -42,7 +42,14 @@
               { lib, pkgs, ... }:
               {
                 imports = [ ./nixos ];
-                services.hyprspace.package = lib.mkOptionDefault inputs.self.packages.${pkgs.system}.default;
+                services.hyprspace.package = lib.mkOptionDefault (
+                  pkgs.callPackage ./package.nix {
+                    generateSchemasProgram = pkgs.callPackage ./dev/generate-schemas.nix {
+                      go-jsonschema = pkgs.callPackage ./dev/pkgs/go-jsonschema { };
+                      settingsModule = ./nixos/settings.nix;
+                    };
+                  }
+                );
               };
           };
         };
@@ -59,18 +66,31 @@
           pkgs,
           ...
         }:
+        let
+          generateSchemasProgram = pkgs.callPackage ./dev/generate-schemas.nix {
+            go-jsonschema = pkgs.callPackage ./dev/pkgs/go-jsonschema { };
+            settingsModule = ./nixos/settings.nix;
+          };
+        in
         {
           packages = {
             default = config.packages.hyprspace;
             hyprspace = pkgs.callPackage ./package.nix {
-              generateSchemasProgram = config.apps.dev-generate-schemas.program;
+              inherit generateSchemasProgram;
             };
             docs = pkgs.callPackage ./docs/package.nix {
               hyprspace = config.packages.default;
               inherit (inputs'.ndg.packages) ndg;
             };
             vendor = pkgs.callPackage ./dev/vendor.nix {
-              generateSchemasProgram = config.apps.dev-generate-schemas.program;
+              inherit generateSchemasProgram;
+            };
+          };
+
+          checks = pkgs.lib.optionalAttrs (pkgs.stdenv.hostPlatform.system == "x86_64-linux") {
+            vm-test = import ./nixos/test.nix {
+              inherit pkgs;
+              self = inputs.self;
             };
           };
         };

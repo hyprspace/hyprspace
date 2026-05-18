@@ -37,6 +37,8 @@ func makeNamedPeers(names ...string) []Peer {
 	return peers
 }
 
+
+
 func TestT14_FindPeer(t *testing.T) {
 	peers := makeTestPeers()
 
@@ -114,4 +116,55 @@ func TestT15_FindPeerByName_EmptyName(t *testing.T) {
 	target, found := FindPeerByName(peers, "")
 	require.True(t, found)
 	assert.Equal(t, "", target.Name)
+}
+
+func TestT16_FindPeerByIDPrefix(t *testing.T) {
+	peers := makeNamedPeers("alice", "bob")
+
+	// Full ID match
+	target, found := FindPeerByIDPrefix(peers, peers[0].ID.String())
+	require.True(t, found)
+	assert.Equal(t, peers[0].ID, target.ID)
+}
+
+func TestT16_FindPeerByIDPrefix_ShortPrefix(t *testing.T) {
+	peers := makeNamedPeers("alice", "bob")
+	shortPrefix := peers[0].ID.String()[:5]
+
+	target, found := FindPeerByIDPrefix(peers, shortPrefix)
+	require.True(t, found)
+	assert.Equal(t, peers[0].ID, target.ID)
+}
+
+func TestT16_FindPeerByIDPrefix_Collision(t *testing.T) {
+	// Generate two peers whose IDs share a prefix
+	pk1, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
+	require.NoError(t, err)
+	pid1, err := peer.IDFromPrivateKey(pk1)
+	require.NoError(t, err)
+
+	pk2, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
+	require.NoError(t, err)
+	pid2, err := peer.IDFromPrivateKey(pk2)
+	require.NoError(t, err)
+
+	peers := []Peer{{ID: pid1, Name: "first"}, {ID: pid2, Name: "second"}}
+
+	// Short prefix likely matches first peer
+	short := pid1.String()[:4]
+	target, found := FindPeerByIDPrefix(peers, short)
+	require.True(t, found)
+	assert.Equal(t, "first", target.Name, "should return first match in slice")
+}
+
+func TestT16_FindPeerByIDPrefix_NoMatch(t *testing.T) {
+	pk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
+	require.NoError(t, err)
+	pid, err := peer.IDFromPrivateKey(pk)
+	require.NoError(t, err)
+
+	peers := []Peer{{ID: pid, Name: "test"}}
+
+	_, found := FindPeerByIDPrefix(peers, "12D3KooZ")
+	assert.False(t, found)
 }

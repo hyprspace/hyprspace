@@ -21,6 +21,67 @@ func TestT1_MkNetID_Deterministic(t *testing.T) {
 	assert.Equal(t, result1, result2, "MkNetID should return the same result for the same peer ID")
 }
 
+func TestT1_MkNetID_AllZero(t *testing.T) {
+	zeroPeer := peer.ID([]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0})
+
+	// All-zero bytes: XOR with 0 leaves magic bytes unchanged
+	expected := [4]byte{0xde, 0xad, 0xbe, 0xef}
+	result := MkNetID(zeroPeer)
+	assert.Equal(t, expected, result, "MkNetID with all-zero peer should return magic bytes")
+}
+
+func TestT1_MkNetID_AllFF(t *testing.T) {
+	// MkNetID starts with [0xde, 0xad, 0xbe, 0xef], XORs each byte of peer ID
+	// With exactly 4 bytes of 0xff:
+	//   r[0] = 0xde ^ 0xff = 0x21
+	//   r[1] = 0xad ^ 0xff = 0x52
+	//   r[2] = 0xbe ^ 0xff = 0x41
+	//   r[3] = 0xef ^ 0xff = 0x10
+	ffPeer := peer.ID([]byte{0xff, 0xff, 0xff, 0xff})
+	expected := [4]byte{0x21, 0x52, 0x41, 0x10}
+	result := MkNetID(ffPeer)
+	assert.Equal(t, expected, result, "MkNetID with all-0xFF bytes should XOR correctly")
+}
+
+func TestT1_MkNetID_LongPeerID(t *testing.T) {
+	// Generate peers with different crypto types (varying lengths)
+	// No panic, no bounds issue regardless of peer ID length
+	testCases := []int{
+		crypto.Ed25519,
+		crypto.Secp256k1,
+	}
+
+	for _, kt := range testCases {
+		pk, _, err := crypto.GenerateKeyPair(kt, 256)
+		require.NoError(t, err)
+		pid, err := peer.IDFromPrivateKey(pk)
+		require.NoError(t, err)
+		assert.NotPanics(t, func() {
+			result := MkNetID(pid)
+			assert.Len(t, result, 4, "MkNetID should return 4 bytes for %s", pid)
+		}, "MkNetID should not panic on %s peer ID (type %d)", pid, kt)
+	}
+}
+
+func TestT1_MkNetID_CollisionResistance(t *testing.T) {
+	ids := make([]peer.ID, 20)
+	for i := 0; i < 20; i++ {
+		pk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
+		require.NoError(t, err)
+		ids[i], err = peer.IDFromPrivateKey(pk)
+		require.NoError(t, err)
+	}
+
+	netIDs := make(map[[4]byte]bool)
+	for _, pid := range ids {
+		netID := MkNetID(pid)
+		assert.False(t, netIDs[netID], "MkNetID collision for peer %s: %v", pid, netID)
+		netIDs[netID] = true
+	}
+
+	assert.Equal(t, 20, len(netIDs), "All 20 MkNetID results should be unique")
+}
+
 func TestT2_MkServiceID_Empty(t *testing.T) {
 	result := MkServiceID("")
 

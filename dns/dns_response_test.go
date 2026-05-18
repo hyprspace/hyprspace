@@ -160,3 +160,50 @@ func TestT27_writeResponse(t *testing.T) {
 	assert.Equal(t, 2, len(txtRecord.Txt))
 	assert.Contains(t, txtRecord.Txt[0], pid.String())
 }
+
+func TestT27_writeResponse_MultipleQuestions(t *testing.T) {
+	pk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
+	require.NoError(t, err)
+	pid, err := peer.IDFromPrivateKey(pk)
+	require.NoError(t, err)
+
+	msg := new(dns.Msg)
+	q1 := dns.Question{Name: "alice.", Qtype: dns.TypeA}
+	q2 := dns.Question{Name: "bob.", Qtype: dns.TypeA}
+	addr1 := net.ParseIP("100.64.1.2")
+	addr2 := net.ParseIP("100.64.1.3")
+
+	writeResponse(msg, q1, pid, addr1)
+	writeResponse(msg, q2, pid, addr2)
+
+	// Should have 2 A records
+	require.Len(t, msg.Answer, 2, "should have 2 A records")
+	assert.Equal(t, "alice.", msg.Answer[0].(*dns.A).Hdr.Name)
+	assert.Equal(t, addr1.To4(), msg.Answer[0].(*dns.A).A)
+	assert.Equal(t, "bob.", msg.Answer[1].(*dns.A).Hdr.Name)
+	assert.Equal(t, addr2.To4(), msg.Answer[1].(*dns.A).A)
+
+	// Should have 2 TXT records in Extra
+	require.Len(t, msg.Extra, 2, "should have 2 TXT records")
+	assert.Equal(t, "alice.", msg.Extra[0].(*dns.TXT).Hdr.Name)
+	assert.Equal(t, "bob.", msg.Extra[1].(*dns.TXT).Hdr.Name)
+	assert.Equal(t, 2, len(msg.Extra[0].(*dns.TXT).Txt))
+	assert.Equal(t, 2, len(msg.Extra[1].(*dns.TXT).Txt))
+}
+
+func TestT27_writeResponse_UnknownType(t *testing.T) {
+	msg := new(dns.Msg)
+	q := dns.Question{Name: "test.", Qtype: dns.TypeMX}
+	addr := net.ParseIP("100.64.1.2")
+
+	// writeResponse always adds an A record regardless of qtype — the no-op
+	// behavior for unknown types happens in the server switch, not in writeResponse.
+	// Verify that writeResponse itself adds an A record with the correct TTL.
+	writeResponse(msg, q, peer.ID("dummy"), addr)
+
+	require.Len(t, msg.Answer, 1, "writeResponse should still produce an A record")
+	aRecord, ok := msg.Answer[0].(*dns.A)
+	require.True(t, ok)
+	assert.Equal(t, "test.", aRecord.Hdr.Name)
+	assert.Equal(t, uint32(0), aRecord.Hdr.Ttl)
+}

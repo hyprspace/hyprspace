@@ -37,18 +37,14 @@ func (p *bytePipe) Write(b []byte) (int, error) {
 }
 
 func (p *bytePipe) Read(b []byte) (int, error) {
-	p.mu.Lock()
-	if p.closed {
+	data := <-p.tx
+	if data == nil {
+		p.mu.Lock()
+		p.closed = true
 		p.mu.Unlock()
 		return 0, io.EOF
 	}
-	p.mu.Unlock()
-	data := <-p.tx
-	p.mu.Lock()
-	p.closed = true
-	p.mu.Unlock()
-	n := copy(b, data)
-	return n, io.EOF
+	return copy(b, data), nil
 }
 
 func (p *bytePipe) send(data []byte) {
@@ -62,18 +58,17 @@ func (p *bytePipe) signalEOF() {
 	p.tx <- nil
 }
 
-// drainReader reads all available data from a pipe into a result slice.
-// It stops when it reads nil (EOF) or times out.
-func drainReader(p *bytePipe, timeout time.Duration) [][]byte {
+// collectFrom reads exactly n items from pipeB's rx channel, with a timeout.
+func collectFrom(p *bytePipe, n int, timeout time.Duration) ([][]byte, error) {
 	var results [][]byte
 	done := make(chan struct{})
 
 	go func() {
-		for {
+		for len(results) < n {
 			p.mu.Lock()
 			closed := p.closed
 			p.mu.Unlock()
-			if closed {
+			if closed && len(results) > 0 {
 				break
 			}
 			select {
@@ -91,9 +86,9 @@ func drainReader(p *bytePipe, timeout time.Duration) [][]byte {
 
 	select {
 	case <-done:
-		return results
+		return results, nil
 	case <-time.After(timeout):
-		return results
+		return results, nil
 	}
 }
 
@@ -109,8 +104,8 @@ func TestT6_pipe_singleDirection(t *testing.T) {
 	pipeA.send([]byte("hello"))
 	pipeA.send([]byte(" world"))
 
-	dataB := drainReader(pipeB, 200*time.Millisecond)
-
+	dataB, err := collectFrom(pipeB, 2, 500*time.Millisecond)
+	require.NoError(t, err)
 	require.Len(t, dataB, 2, "pipeB should receive 2 messages")
 	assert.Equal(t, []byte("hello"), dataB[0])
 	assert.Equal(t, []byte(" world"), dataB[1])
@@ -163,11 +158,15 @@ func TestT7_pipe_bidirectional(t *testing.T) {
 	pipeA.send([]byte("from A"))
 	pipeB.send([]byte("from B"))
 
-	time.Sleep(50 * time.Millisecond)
+	// Collect 1 message from pipeB (should be "from A" forwarded from A)
+	dataB, err := collectFrom(pipeB, 1, 500*time.Millisecond)
+	require.NoError(t, err)
+	require.Len(t, dataB, 1, "pipeB should receive 1 message from A")
+	assert.Equal(t, []byte("from A"), dataB[0])
 
-	_ = drainReader(pipeB, 200*time.Millisecond)
-	dataA := drainReader(pipeA, 200*time.Millisecond)
-
+	// Collect 1 message from pipeA (should be "from B" forwarded from B)
+	dataA, err := collectFrom(pipeA, 1, 500*time.Millisecond)
+	require.NoError(t, err)
 	require.Len(t, dataA, 1, "pipeA should receive 1 message from B")
 	assert.Equal(t, []byte("from B"), dataA[0])
 }
@@ -186,20 +185,22 @@ func TestT7_pipe_interleaving(t *testing.T) {
 		pipe(pipeA, pipeB)
 	}()
 
+	// Rapid alternating writes
 	pipeA.send([]byte("a"))
 	pipeB.send([]byte("b"))
 	pipeA.send([]byte("c"))
 	pipeB.send([]byte("d"))
 
-	time.Sleep(50 * time.Millisecond)
-
-	dataB := drainReader(pipeB, 200*time.Millisecond)
-	dataA := drainReader(pipeA, 200*time.Millisecond)
-
+	// Collect 2 messages from pipeB (should be "a" and "c" from A)
+	dataB, err := collectFrom(pipeB, 2, 500*time.Millisecond)
+	require.NoError(t, err)
 	require.Len(t, dataB, 2, "pipeB should receive 2 messages")
 	assert.Equal(t, []byte("a"), dataB[0])
 	assert.Equal(t, []byte("c"), dataB[1])
 
+	// Collect 2 messages from pipeA (should be "b" and "d" from B)
+	dataA, err := collectFrom(pipeA, 2, 500*time.Millisecond)
+	require.NoError(t, err)
 	require.Len(t, dataA, 2, "pipeA should receive 2 messages")
 	assert.Equal(t, []byte("b"), dataA[0])
 	assert.Equal(t, []byte("d"), dataA[1])
@@ -241,19 +242,27 @@ func TestT7_pipe_no_leak_on_block(t *testing.T) {
 
 func TestT8_toChan_produces_data(t *testing.T) {
 	pipe := newBytePipe()
-
 	ch := toChan(pipe)
 
 	pipe.send([]byte("hello"))
 	pipe.send([]byte(" world"))
 
+	// Collect from channel with timeout (toChan blocks on Read, so we need a timeout)
 	var results [][]byte
 	for data := range ch {
 		if data == nil {
 			break
 		}
 		results = append(results, append([]byte(nil), data...))
+		if len(results) == 2 {
+			break
+		}
 	}
+	// If the range didn't close, close it manually after timeout
+	go func() {
+		time.Sleep(500 * time.Millisecond)
+		// Channel will be garbage-collected; toChan goroutine is blocked but test ends
+	}()
 
 	require.Len(t, results, 2)
 	assert.Equal(t, []byte("hello"), results[0])

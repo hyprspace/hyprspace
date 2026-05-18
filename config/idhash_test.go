@@ -197,3 +197,87 @@ func TestT4_MkBuiltinAddr6_DifferentPeers(t *testing.T) {
 
 	assert.Equal(t, 10, len(addrs), "All 10 peers should have unique IPv6 addresses")
 }
+
+func TestT5_MkServiceAddr6_Deterministic(t *testing.T) {
+	pk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
+	require.NoError(t, err)
+	pid, err := peer.IDFromPrivateKey(pk)
+	require.NoError(t, err)
+
+	addr1 := MkServiceAddr6(pid, "http")
+	addr2 := MkServiceAddr6(pid, "http")
+
+	assert.Equal(t, addr1, addr2, "MkServiceAddr6 should be deterministic")
+}
+
+func TestT5_MkServiceAddr6_DifferentServices(t *testing.T) {
+	pk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
+	require.NoError(t, err)
+	pid, err := peer.IDFromPrivateKey(pk)
+	require.NoError(t, err)
+
+	addrHTTP := MkServiceAddr6(pid, "http")
+	addrSSH := MkServiceAddr6(pid, "ssh")
+
+	assert.NotEqual(t, addrHTTP, addrSSH, "Different services should produce different addresses")
+}
+
+func TestT5_MkServiceAddr6_DifferentPeers(t *testing.T) {
+	ids := make([]peer.ID, 5)
+	for i := 0; i < 5; i++ {
+		pk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
+		require.NoError(t, err)
+		ids[i], err = peer.IDFromPrivateKey(pk)
+		require.NoError(t, err)
+	}
+
+	addrs := make(map[string]bool)
+	for _, pid := range ids {
+		addr := MkServiceAddr6(pid, "http")
+		addrStr := addr.String()
+		assert.False(t, addrs[addrStr], "MkServiceAddr6 collision for peer %s: %s", pid, addrStr)
+		addrs[addrStr] = true
+	}
+
+	assert.Equal(t, 5, len(addrs), "All 5 peers should have unique service addresses")
+}
+
+func TestT5_MkServiceAddr6_CollisionResistance(t *testing.T) {
+	ids := make([]peer.ID, 10)
+	for i := 0; i < 10; i++ {
+		pk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
+		require.NoError(t, err)
+		ids[i], err = peer.IDFromPrivateKey(pk)
+		require.NoError(t, err)
+	}
+	services := []string{"http", "ssh", "grpc"}
+
+	addrs := make(map[string]bool)
+	for _, pid := range ids {
+		for _, svc := range services {
+			addr := MkServiceAddr6(pid, svc).String()
+			assert.False(t, addrs[addr], "Collision: peer %s with service %s: %s", pid, svc, addr)
+			addrs[addr] = true
+		}
+	}
+
+	assert.Equal(t, 30, len(addrs), "All 30 addresses should be unique")
+}
+
+func TestT5_MkServiceAddr6_NetIDAndServiceByteLayout(t *testing.T) {
+	pk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
+	require.NoError(t, err)
+	pid, err := peer.IDFromPrivateKey(pk)
+	require.NoError(t, err)
+
+	addr := MkServiceAddr6(pid, "http")
+	netID := MkNetID(pid)
+	svcID := MkServiceID("http")
+
+	assert.Equal(t, netID[0], addr[10], "Address byte 10 should match netID[0]")
+	assert.Equal(t, netID[1], addr[11], "Address byte 11 should match netID[1]")
+	assert.Equal(t, netID[2], addr[12], "Address byte 12 should match netID[2]")
+	assert.Equal(t, netID[3], addr[13], "Address byte 13 should match netID[3]")
+	assert.Equal(t, svcID[0], addr[14], "Address byte 14 should match svcID[0]")
+	assert.Equal(t, svcID[1], addr[15], "Address byte 15 should match svcID[1]")
+}

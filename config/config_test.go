@@ -10,13 +10,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func makeTestPeers() []Peer {
+func makeTestPeers(t *testing.T) []Peer {
 	peers := make([]Peer, 3)
 	for i := 0; i < 3; i++ {
 		pk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
-		require.NoError(nil, err)
+		require.NoError(t, err)
 		pid, err := peer.IDFromPrivateKey(pk)
-		require.NoError(nil, err)
+		require.NoError(t, err)
 		peers[i] = Peer{
 			ID:   pid,
 			Name: fmt.Sprintf("peer%d", i),
@@ -25,13 +25,13 @@ func makeTestPeers() []Peer {
 	return peers
 }
 
-func makeNamedPeers(names ...string) []Peer {
+func makeNamedPeers(t *testing.T, names ...string) []Peer {
 	peers := make([]Peer, len(names))
 	for i, name := range names {
 		pk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
-		require.NoError(nil, err)
+		require.NoError(t, err)
 		pid, err := peer.IDFromPrivateKey(pk)
-		require.NoError(nil, err)
+		require.NoError(t, err)
 		peers[i] = Peer{ID: pid, Name: name}
 	}
 	return peers
@@ -40,7 +40,7 @@ func makeNamedPeers(names ...string) []Peer {
 
 
 func TestT14_FindPeer(t *testing.T) {
-	peers := makeTestPeers()
+	peers := makeTestPeers(t)
 
 	// Exact match: peer 1's ID
 	target, found := FindPeer(peers, peers[1].ID)
@@ -50,7 +50,7 @@ func TestT14_FindPeer(t *testing.T) {
 }
 
 func TestT14_FindPeer_NoMatch(t *testing.T) {
-	peers := makeTestPeers()
+	peers := makeTestPeers(t)
 	pk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
 	require.NoError(t, err)
 	pid, err := peer.IDFromPrivateKey(pk)
@@ -62,9 +62,9 @@ func TestT14_FindPeer_NoMatch(t *testing.T) {
 
 func TestT14_FindPeer_SinglePeer(t *testing.T) {
 	pk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
-	require.NoError(nil, err)
+	require.NoError(t, err)
 	pid, err := peer.IDFromPrivateKey(pk)
-	require.NoError(nil, err)
+	require.NoError(t, err)
 
 	peers := []Peer{{ID: pid, Name: "solo"}}
 	target, found := FindPeer(peers, pid)
@@ -73,19 +73,21 @@ func TestT14_FindPeer_SinglePeer(t *testing.T) {
 }
 
 func TestT14_FindPeer_EmptySlice(t *testing.T) {
-	var peers []Peer
+	// Non-nil empty slice — different from nil slice
+	peers := []Peer{}
 	_, found := FindPeer(peers, peer.ID("any"))
 	assert.False(t, found)
 }
 
 func TestT14_FindPeer_NilSlice(t *testing.T) {
+	// Nil slice — zero-value slice
 	var peers []Peer
 	_, found := FindPeer(peers, peer.ID("any"))
 	assert.False(t, found)
 }
 
 func TestT15_FindPeerByName(t *testing.T) {
-	peers := makeNamedPeers("alice", "bob", "charlie")
+	peers := makeNamedPeers(t, "alice", "bob", "charlie")
 
 	target, found := FindPeerByName(peers, "bob")
 	require.True(t, found)
@@ -93,14 +95,14 @@ func TestT15_FindPeerByName(t *testing.T) {
 }
 
 func TestT15_FindPeerByName_CaseMismatch(t *testing.T) {
-	peers := makeNamedPeers("Alice", "Bob")
+	peers := makeNamedPeers(t, "Alice", "Bob")
 
 	_, found := FindPeerByName(peers, "alice")
 	assert.False(t, found, "should be case-sensitive")
 }
 
 func TestT15_FindPeerByName_NoMatch(t *testing.T) {
-	peers := makeNamedPeers("alice")
+	peers := makeNamedPeers(t, "alice")
 
 	_, found := FindPeerByName(peers, "charlie")
 	assert.False(t, found)
@@ -119,7 +121,7 @@ func TestT15_FindPeerByName_EmptyName(t *testing.T) {
 }
 
 func TestT16_FindPeerByIDPrefix(t *testing.T) {
-	peers := makeNamedPeers("alice", "bob")
+	peers := makeNamedPeers(t, "alice", "bob")
 
 	// Full ID match
 	target, found := FindPeerByIDPrefix(peers, peers[0].ID.String())
@@ -128,7 +130,7 @@ func TestT16_FindPeerByIDPrefix(t *testing.T) {
 }
 
 func TestT16_FindPeerByIDPrefix_ShortPrefix(t *testing.T) {
-	peers := makeNamedPeers("alice", "bob")
+	peers := makeNamedPeers(t, "alice", "bob")
 	shortPrefix := peers[0].ID.String()[:5]
 
 	target, found := FindPeerByIDPrefix(peers, shortPrefix)
@@ -170,7 +172,7 @@ func TestT16_FindPeerByIDPrefix_NoMatch(t *testing.T) {
 }
 
 func TestT17_FindPeerByCLIRef_Name(t *testing.T) {
-	peers := makeNamedPeers("alice", "bob")
+	peers := makeNamedPeers(t, "alice", "bob")
 
 	target, found := FindPeerByCLIRef(peers, "@alice")
 	require.True(t, found)
@@ -178,14 +180,14 @@ func TestT17_FindPeerByCLIRef_Name(t *testing.T) {
 }
 
 func TestT17_FindPeerByCLIRef_NameNotFound(t *testing.T) {
-	peers := makeNamedPeers("alice")
+	peers := makeNamedPeers(t, "alice")
 
 	_, found := FindPeerByCLIRef(peers, "@charlie")
 	assert.False(t, found)
 }
 
 func TestT17_FindPeerByCLIRef_IDPrefix(t *testing.T) {
-	peers := makeNamedPeers("alice", "bob")
+	peers := makeNamedPeers(t, "alice", "bob")
 
 	target, found := FindPeerByCLIRef(peers, peers[0].ID.String()[:4])
 	require.True(t, found)
@@ -204,4 +206,12 @@ func TestT17_FindPeerByCLIRef_Empty(t *testing.T) {
 	target, found := FindPeerByCLIRef(peers, "")
 	require.True(t, found)
 	assert.Equal(t, pid, target.ID)
+}
+
+func TestT17_FindPeerByCLIRef_BareStringNoMatch(t *testing.T) {
+	peers := makeNamedPeers(t, "alice", "bob")
+
+	// Bare string without @ and not matching any ID prefix
+	_, found := FindPeerByCLIRef(peers, "random")
+	assert.False(t, found, "FindPeerByCLIRef('random') should return nil, false")
 }

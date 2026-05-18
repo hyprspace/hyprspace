@@ -71,17 +71,11 @@ func TestT20_PeersReply_Populated(t *testing.T) {
 
 func TestT21_Args_ZeroValue(t *testing.T) {
 	args := Args{}
-	// Args struct has no fields - just verify zero value creation works
+	// Args is an empty struct — verify zero value creation
+	assert.Equal(t, Args{}, args)
 }
 
-func TestT21_Args_Populated(t *testing.T) {
-	args := Args{
-		Name: "status",
-	}
-	assert.Equal(t, "status", args.Name)
-}
-
-func TestT21_Args_RouteArgs(t *testing.T) {
+func TestT21_RouteArgs(t *testing.T) {
 	routeArgs := RouteArgs{
 		Action: Show,
 		Args:   []string{"show"},

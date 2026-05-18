@@ -168,3 +168,40 @@ func TestT16_FindPeerByIDPrefix_NoMatch(t *testing.T) {
 	_, found := FindPeerByIDPrefix(peers, "12D3KooZ")
 	assert.False(t, found)
 }
+
+func TestT17_FindPeerByCLIRef_Name(t *testing.T) {
+	peers := makeNamedPeers("alice", "bob")
+
+	target, found := FindPeerByCLIRef(peers, "@alice")
+	require.True(t, found)
+	assert.Equal(t, "alice", target.Name)
+}
+
+func TestT17_FindPeerByCLIRef_NameNotFound(t *testing.T) {
+	peers := makeNamedPeers("alice")
+
+	_, found := FindPeerByCLIRef(peers, "@charlie")
+	assert.False(t, found)
+}
+
+func TestT17_FindPeerByCLIRef_IDPrefix(t *testing.T) {
+	peers := makeNamedPeers("alice", "bob")
+
+	target, found := FindPeerByCLIRef(peers, peers[0].ID.String()[:4])
+	require.True(t, found)
+	assert.Equal(t, peers[0].ID, target.ID)
+}
+
+func TestT17_FindPeerByCLIRef_Empty(t *testing.T) {
+	pk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
+	require.NoError(t, err)
+	pid, err := peer.IDFromPrivateKey(pk)
+	require.NoError(t, err)
+
+	peers := []Peer{{ID: pid, Name: "test"}}
+
+	// Empty string -> FindPeerByIDPrefix("") -> matches first peer (HasPrefix("x", "") is always true)
+	target, found := FindPeerByCLIRef(peers, "")
+	require.True(t, found)
+	assert.Equal(t, pid, target.ID)
+}

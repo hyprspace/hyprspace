@@ -60,3 +60,79 @@ func TestT2_MkServiceID_Deterministic(t *testing.T) {
 
 	assert.Equal(t, result1, result2, "MkServiceID should be deterministic")
 }
+
+func TestT3_MkBuiltinAddr4_Deterministic(t *testing.T) {
+	 pk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
+	require.NoError(t, err)
+	pid, err := peer.IDFromPrivateKey(pk)
+	require.NoError(t, err)
+
+	addr1 := mkBuiltinAddr4(pid)
+	addr2 := mkBuiltinAddr4(pid)
+
+	assert.Equal(t, addr1, addr2, "mkBuiltinAddr4 should be deterministic")
+	assert.NotNil(t, addr1)
+}
+
+func TestT3_MkBuiltinAddr4_AllZeros(t *testing.T) {
+	zeroPeer := peer.ID([]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0})
+
+	result := mkBuiltinAddr4(zeroPeer)
+
+	expected := []byte{100, 64, 1, 2}
+	assert.Equal(t, expected, []byte(result.To4()), "mkBuiltinAddr4 with zero peer should return base address")
+}
+
+func TestT3_MkBuiltinAddr4_DifferentPeers(t *testing.T) {
+	ids := make([]peer.ID, 20)
+	for i := 0; i < 20; i++ {
+		pk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
+		require.NoError(t, err)
+		ids[i], err = peer.IDFromPrivateKey(pk)
+		require.NoError(t, err)
+	}
+
+	addrs := make(map[string]bool)
+	for _, pid := range ids {
+		addr := mkBuiltinAddr4(pid).To4()
+		addrStr := addr.String()
+		assert.False(t, addrs[addrStr], "mkBuiltinAddr4 collision for peer %s: %s", pid, addrStr)
+		addrs[addrStr] = true
+	}
+
+	assert.Equal(t, 20, len(addrs), "All 20 peers should have unique IPv4 addresses")
+}
+
+func TestT3_MkBuiltinAddr4_VaryingLengths(t *testing.T) {
+	testCases := []struct {
+		name string
+		data []byte
+	}{
+		{"empty", []byte{}},
+		{"short", []byte{1, 2, 3}},
+		{"odd", make([]byte, 7)},
+		{"even", make([]byte, 8)},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			pid := peer.ID(tc.data)
+			assert.NotPanics(t, func() {
+				_ = mkBuiltinAddr4(pid)
+			}, "mkBuiltinAddr4 should not panic on %s peer ID", tc.name)
+		})
+	}
+}
+
+func TestT3_MkBuiltinAddr4_StartsWith100_64(t *testing.T) {
+	for i := 0; i < 10; i++ {
+		pk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
+		require.NoError(t, err)
+		pid, err := peer.IDFromPrivateKey(pk)
+		require.NoError(t, err)
+
+		addr := mkBuiltinAddr4(pid)
+		assert.Equal(t, byte(100), addr[0], "IPv4 should start with 100 for peer %s", pid)
+		assert.Equal(t, byte(64), addr[1], "IPv4 should start with 64 for peer %s", pid)
+	}
+}

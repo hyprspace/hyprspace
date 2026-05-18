@@ -25,6 +25,18 @@ func makeTestPeers() []Peer {
 	return peers
 }
 
+func makeNamedPeers(names ...string) []Peer {
+	peers := make([]Peer, len(names))
+	for i, name := range names {
+		pk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
+		require.NoError(nil, err)
+		pid, err := peer.IDFromPrivateKey(pk)
+		require.NoError(nil, err)
+		peers[i] = Peer{ID: pid, Name: name}
+	}
+	return peers
+}
+
 func TestT14_FindPeer(t *testing.T) {
 	peers := makeTestPeers()
 
@@ -68,4 +80,38 @@ func TestT14_FindPeer_NilSlice(t *testing.T) {
 	var peers []Peer
 	_, found := FindPeer(peers, peer.ID("any"))
 	assert.False(t, found)
+}
+
+func TestT15_FindPeerByName(t *testing.T) {
+	peers := makeNamedPeers("alice", "bob", "charlie")
+
+	target, found := FindPeerByName(peers, "bob")
+	require.True(t, found)
+	assert.Equal(t, "bob", target.Name)
+}
+
+func TestT15_FindPeerByName_CaseMismatch(t *testing.T) {
+	peers := makeNamedPeers("Alice", "Bob")
+
+	_, found := FindPeerByName(peers, "alice")
+	assert.False(t, found, "should be case-sensitive")
+}
+
+func TestT15_FindPeerByName_NoMatch(t *testing.T) {
+	peers := makeNamedPeers("alice")
+
+	_, found := FindPeerByName(peers, "charlie")
+	assert.False(t, found)
+}
+
+func TestT15_FindPeerByName_EmptyName(t *testing.T) {
+	pk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
+	require.NoError(t, err)
+	pid, err := peer.IDFromPrivateKey(pk)
+	require.NoError(t, err)
+
+	peers := []Peer{{ID: pid, Name: ""}}
+	target, found := FindPeerByName(peers, "")
+	require.True(t, found)
+	assert.Equal(t, "", target.Name)
 }

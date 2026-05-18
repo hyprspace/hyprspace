@@ -5,6 +5,3 @@ result-*
 .data/
 *_generated.go
 .direnv/
-Agent.md
-wiki/
-

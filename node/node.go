@@ -22,6 +22,7 @@ import (
 	"github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-cidranger"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
+	"github.com/libp2p/go-libp2p/core/connmgr"
 	"github.com/libp2p/go-libp2p/core/event"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
@@ -110,6 +111,30 @@ func (node *Node) Run() error {
 		routeOpts = append(routeOpts, tun.Route(r.Network()))
 	}
 
+	recursionGater := p2p.NewRecursionGater(node.cfg)
+	var gater connmgr.ConnectionGater
+	if node.cfg.FilterPrivateAddresses {
+		gater = p2p.NewMultiGater(
+			recursionGater,
+			p2p.NewFilterGater(
+				// IPv4 local
+				parseCIDR("10.0.0.0/8"),
+				parseCIDR("172.16.0.0/12"),
+				parseCIDR("192.168.0.0/16"),
+				// IPv4 link-local
+				parseCIDR("169.254.0.0/16"),
+				// IPv4 loopback
+				parseCIDR("127.0.0.0/8"),
+				// IPv6 link-local
+				parseCIDR("fe80::/10"),
+				// IPv6 loopback
+				parseCIDR("::1/128"),
+			),
+		)
+	} else {
+		gater = recursionGater
+	}
+
 	logger.Info("Creating LibP2P node")
 
 	// Create P2P Node
@@ -119,7 +144,7 @@ func (node *Node) Run() error {
 		node.cfg.ListenAddresses,
 		node.streamHandler,
 		p2p.NewClosedCircuitRelayFilter(node.cfg.Peers),
-		p2p.NewRecursionGater(node.cfg),
+		gater,
 		node.cfg.Peers,
 	)
 	if err != nil {
@@ -448,4 +473,12 @@ func (node *Node) Stop() error {
 	node.cancel()
 	node.wg.Wait()
 	return nil
+}
+
+func parseCIDR(s string) net.IPNet {
+	_, n, err := net.ParseCIDR(s)
+	if err != nil {
+		panic("invalid CIDR: " + s)
+	}
+	return *n
 }

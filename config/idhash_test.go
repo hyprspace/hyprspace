@@ -136,3 +136,64 @@ func TestT3_MkBuiltinAddr4_StartsWith100_64(t *testing.T) {
 		assert.Equal(t, byte(64), addr[1], "IPv4 should start with 64 for peer %s", pid)
 	}
 }
+
+func TestT4_MkBuiltinAddr6_Deterministic(t *testing.T) {
+	pk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
+	require.NoError(t, err)
+	pid, err := peer.IDFromPrivateKey(pk)
+	require.NoError(t, err)
+
+	addr1 := mkBuiltinAddr6(pid)
+	addr2 := mkBuiltinAddr6(pid)
+
+	assert.Equal(t, addr1, addr2, "mkBuiltinAddr6 should be deterministic")
+	assert.NotNil(t, addr1)
+	assert.Equal(t, 16, len(addr1.To16()), "Should return a valid 16-byte IPv6 address")
+}
+
+func TestT4_MkBuiltinAddr6_NetIDConsistency(t *testing.T) {
+	pk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
+	require.NoError(t, err)
+	pid, err := peer.IDFromPrivateKey(pk)
+	require.NoError(t, err)
+
+	ipv6 := mkBuiltinAddr6(pid)
+	netID := MkNetID(pid)
+
+	assert.Equal(t, netID[0], ipv6[12], "IPv6 byte 12 should match netID[0]")
+	assert.Equal(t, netID[1], ipv6[13], "IPv6 byte 13 should match netID[1]")
+	assert.Equal(t, netID[2], ipv6[14], "IPv6 byte 14 should match netID[2]")
+	assert.Equal(t, netID[3], ipv6[15], "IPv6 byte 15 should match netID[3]")
+}
+
+func TestT4_MkBuiltinAddr6_Prefix(t *testing.T) {
+	pk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
+	require.NoError(t, err)
+	pid, err := peer.IDFromPrivateKey(pk)
+	require.NoError(t, err)
+
+	ipv6 := mkBuiltinAddr6(pid)
+
+	expectedPrefix := []byte{0xfd, 0x00, 'h', 'y', 'p', 'r', 's', 'p', 'a', 'c', 'e', 0x00}
+	assert.Equal(t, expectedPrefix, []byte(ipv6[:12]), "IPv6 should have fixed prefix in first 12 bytes")
+}
+
+func TestT4_MkBuiltinAddr6_DifferentPeers(t *testing.T) {
+	ids := make([]peer.ID, 10)
+	for i := 0; i < 10; i++ {
+		pk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
+		require.NoError(t, err)
+		ids[i], err = peer.IDFromPrivateKey(pk)
+		require.NoError(t, err)
+	}
+
+	addrs := make(map[string]bool)
+	for _, pid := range ids {
+		addr := mkBuiltinAddr6(pid).To16()
+		addrStr := addr.String()
+		assert.False(t, addrs[addrStr], "mkBuiltinAddr6 collision for peer %s: %s", pid, addrStr)
+		addrs[addrStr] = true
+	}
+
+	assert.Equal(t, 10, len(addrs), "All 10 peers should have unique IPv6 addresses")
+}

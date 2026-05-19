@@ -39,7 +39,7 @@ func makeNamedPeers(t *testing.T, names ...string) []Peer {
 
 
 
-func TestT14_FindPeer(t *testing.T) {
+func Test_FindPeer(t *testing.T) {
 	peers := makeTestPeers(t)
 
 	// Exact match: peer 1's ID
@@ -49,7 +49,7 @@ func TestT14_FindPeer(t *testing.T) {
 	assert.Equal(t, "peer1", target.Name)
 }
 
-func TestT14_FindPeer_NoMatch(t *testing.T) {
+func Test_FindPeer_NoMatch(t *testing.T) {
 	peers := makeTestPeers(t)
 	pk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
 	require.NoError(t, err)
@@ -60,7 +60,7 @@ func TestT14_FindPeer_NoMatch(t *testing.T) {
 	assert.False(t, found)
 }
 
-func TestT14_FindPeer_SinglePeer(t *testing.T) {
+func Test_FindPeer_SinglePeer(t *testing.T) {
 	pk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
 	require.NoError(t, err)
 	pid, err := peer.IDFromPrivateKey(pk)
@@ -72,21 +72,21 @@ func TestT14_FindPeer_SinglePeer(t *testing.T) {
 	assert.Equal(t, pid, target.ID)
 }
 
-func TestT14_FindPeer_EmptySlice(t *testing.T) {
+func Test_FindPeer_EmptySlice(t *testing.T) {
 	// Non-nil empty slice — different from nil slice
 	peers := []Peer{}
 	_, found := FindPeer(peers, peer.ID("any"))
 	assert.False(t, found)
 }
 
-func TestT14_FindPeer_NilSlice(t *testing.T) {
+func Test_FindPeer_NilSlice(t *testing.T) {
 	// Nil slice — zero-value slice
 	var peers []Peer
 	_, found := FindPeer(peers, peer.ID("any"))
 	assert.False(t, found)
 }
 
-func TestT15_FindPeerByName(t *testing.T) {
+func Test_FindPeerByName(t *testing.T) {
 	peers := makeNamedPeers(t, "alice", "bob", "charlie")
 
 	target, found := FindPeerByName(peers, "bob")
@@ -94,21 +94,21 @@ func TestT15_FindPeerByName(t *testing.T) {
 	assert.Equal(t, "bob", target.Name)
 }
 
-func TestT15_FindPeerByName_CaseMismatch(t *testing.T) {
+func Test_FindPeerByName_CaseMismatch(t *testing.T) {
 	peers := makeNamedPeers(t, "Alice", "Bob")
 
 	_, found := FindPeerByName(peers, "alice")
 	assert.False(t, found, "should be case-sensitive")
 }
 
-func TestT15_FindPeerByName_NoMatch(t *testing.T) {
+func Test_FindPeerByName_NoMatch(t *testing.T) {
 	peers := makeNamedPeers(t, "alice")
 
 	_, found := FindPeerByName(peers, "charlie")
 	assert.False(t, found)
 }
 
-func TestT15_FindPeerByName_EmptyName(t *testing.T) {
+func Test_FindPeerByName_EmptyName(t *testing.T) {
 	pk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
 	require.NoError(t, err)
 	pid, err := peer.IDFromPrivateKey(pk)
@@ -120,7 +120,7 @@ func TestT15_FindPeerByName_EmptyName(t *testing.T) {
 	assert.Equal(t, "", target.Name)
 }
 
-func TestT16_FindPeerByIDPrefix(t *testing.T) {
+func Test_FindPeerByIDPrefix(t *testing.T) {
 	peers := makeNamedPeers(t, "alice", "bob")
 
 	// Full ID match
@@ -129,7 +129,7 @@ func TestT16_FindPeerByIDPrefix(t *testing.T) {
 	assert.Equal(t, peers[0].ID, target.ID)
 }
 
-func TestT16_FindPeerByIDPrefix_ShortPrefix(t *testing.T) {
+func Test_FindPeerByIDPrefix_ShortPrefix(t *testing.T) {
 	peers := makeNamedPeers(t, "alice", "bob")
 	shortPrefix := peers[0].ID.String()[:5]
 
@@ -138,8 +138,8 @@ func TestT16_FindPeerByIDPrefix_ShortPrefix(t *testing.T) {
 	assert.Equal(t, peers[0].ID, target.ID)
 }
 
-func TestT16_FindPeerByIDPrefix_Collision(t *testing.T) {
-	// Generate two peers whose IDs share a prefix
+func Test_FindPeerByIDPrefix_Collision(t *testing.T) {
+	// Generate two real peer IDs and use a prefix that matches both
 	pk1, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
 	require.NoError(t, err)
 	pid1, err := peer.IDFromPrivateKey(pk1)
@@ -152,14 +152,17 @@ func TestT16_FindPeerByIDPrefix_Collision(t *testing.T) {
 
 	peers := []Peer{{ID: pid1, Name: "first"}, {ID: pid2, Name: "second"}}
 
-	// Short prefix likely matches first peer
-	short := pid1.String()[:4]
-	target, found := FindPeerByIDPrefix(peers, short)
-	require.True(t, found)
+	// All Ed25519 peer IDs start with "12D3KooW", so a 6-char prefix matches both
+	// Verify this holds for both generated peers
+	commonPrefix := pid1.String()[:6]
+	assert.Equal(t, pid2.String()[:6], commonPrefix, "both Ed25519 peer IDs should share the first 6 chars")
+
+	target, found := FindPeerByIDPrefix(peers, commonPrefix)
+	require.True(t, found, "6-char prefix should match (collision)")
 	assert.Equal(t, "first", target.Name, "should return first match in slice")
 }
 
-func TestT16_FindPeerByIDPrefix_NoMatch(t *testing.T) {
+func Test_FindPeerByIDPrefix_NoMatch(t *testing.T) {
 	pk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
 	require.NoError(t, err)
 	pid, err := peer.IDFromPrivateKey(pk)
@@ -171,7 +174,7 @@ func TestT16_FindPeerByIDPrefix_NoMatch(t *testing.T) {
 	assert.False(t, found)
 }
 
-func TestT17_FindPeerByCLIRef_Name(t *testing.T) {
+func Test_FindPeerByCLIRef_Name(t *testing.T) {
 	peers := makeNamedPeers(t, "alice", "bob")
 
 	target, found := FindPeerByCLIRef(peers, "@alice")
@@ -179,14 +182,14 @@ func TestT17_FindPeerByCLIRef_Name(t *testing.T) {
 	assert.Equal(t, "alice", target.Name)
 }
 
-func TestT17_FindPeerByCLIRef_NameNotFound(t *testing.T) {
+func Test_FindPeerByCLIRef_NameNotFound(t *testing.T) {
 	peers := makeNamedPeers(t, "alice")
 
 	_, found := FindPeerByCLIRef(peers, "@charlie")
 	assert.False(t, found)
 }
 
-func TestT17_FindPeerByCLIRef_IDPrefix(t *testing.T) {
+func Test_FindPeerByCLIRef_IDPrefix(t *testing.T) {
 	peers := makeNamedPeers(t, "alice", "bob")
 
 	target, found := FindPeerByCLIRef(peers, peers[0].ID.String()[:4])
@@ -194,7 +197,7 @@ func TestT17_FindPeerByCLIRef_IDPrefix(t *testing.T) {
 	assert.Equal(t, peers[0].ID, target.ID)
 }
 
-func TestT17_FindPeerByCLIRef_Empty(t *testing.T) {
+func Test_FindPeerByCLIRef_Empty(t *testing.T) {
 	pk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
 	require.NoError(t, err)
 	pid, err := peer.IDFromPrivateKey(pk)
@@ -202,13 +205,12 @@ func TestT17_FindPeerByCLIRef_Empty(t *testing.T) {
 
 	peers := []Peer{{ID: pid, Name: "test"}}
 
-	// Empty string -> FindPeerByIDPrefix("") -> matches first peer (HasPrefix("x", "") is always true)
-	target, found := FindPeerByCLIRef(peers, "")
-	require.True(t, found)
-	assert.Equal(t, pid, target.ID)
+	// Empty string should not match any peer — empty CLI ref is invalid
+	_, found := FindPeerByCLIRef(peers, "")
+	assert.False(t, found, "empty string should not match any peer")
 }
 
-func TestT17_FindPeerByCLIRef_BareStringNoMatch(t *testing.T) {
+func Test_FindPeerByCLIRef_BareStringNoMatch(t *testing.T) {
 	peers := makeNamedPeers(t, "alice", "bob")
 
 	// Bare string without @ and not matching any ID prefix

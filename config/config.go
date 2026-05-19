@@ -222,6 +222,9 @@ func FindPeerByIDPrefix(peers []Peer, needle string) (*Peer, bool) {
 }
 
 func FindPeerByCLIRef(peers []Peer, needle string) (*Peer, bool) {
+	if needle == "" {
+		return nil, false
+	}
 	if strings.HasPrefix(needle, "@") {
 		name := strings.TrimPrefix(needle, "@")
 		return FindPeerByName(peers, name)

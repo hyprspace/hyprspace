@@ -6,25 +6,25 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestT18_RouteActionConstants(t *testing.T) {
+func Test_RouteActionConstants(t *testing.T) {
 	assert.Equal(t, RouteAction("show"), Show)
 	assert.Equal(t, RouteAction("add"), Add)
 	assert.Equal(t, RouteAction("del"), Del)
 }
 
-func TestT18_RouteActionConstants_StringValues(t *testing.T) {
+func Test_RouteActionConstants_StringValues(t *testing.T) {
 	assert.Equal(t, "show", string(Show))
 	assert.Equal(t, "add", string(Add))
 	assert.Equal(t, "del", string(Del))
 }
 
-func TestT18_RouteActionConstants_AreDistinct(t *testing.T) {
+func Test_RouteActionConstants_AreDistinct(t *testing.T) {
 	assert.NotEqual(t, Show, Add)
 	assert.NotEqual(t, Add, Del)
 	assert.NotEqual(t, Show, Del)
 }
 
-func TestT19_StatusReply_ZeroValue(t *testing.T) {
+func Test_StatusReply_ZeroValue(t *testing.T) {
 	reply := StatusReply{}
 	assert.Equal(t, "", reply.PeerID)
 	assert.Equal(t, 0, reply.SwarmPeersCurrent)
@@ -34,7 +34,7 @@ func TestT19_StatusReply_ZeroValue(t *testing.T) {
 	assert.Nil(t, reply.ListenAddrs)
 }
 
-func TestT19_StatusReply_Populated(t *testing.T) {
+func Test_StatusReply_Populated(t *testing.T) {
 	reply := StatusReply{
 		PeerID:              "test-peer",
 		SwarmPeersCurrent:   3,
@@ -54,12 +54,12 @@ func TestT19_StatusReply_Populated(t *testing.T) {
 	assert.Equal(t, "/ip4/0.0.0.0/tcp/4001", reply.ListenAddrs[0])
 }
 
-func TestT20_PeersReply_ZeroValue(t *testing.T) {
+func Test_PeersReply_ZeroValue(t *testing.T) {
 	reply := PeersReply{}
 	assert.Nil(t, reply.PeerAddrs)
 }
 
-func TestT20_PeersReply_Populated(t *testing.T) {
+func Test_PeersReply_Populated(t *testing.T) {
 	reply := PeersReply{
 		PeerAddrs: []string{"/ip4/1.2.3.4/p2p/abc", "/ip4/5.6.7.8/p2p/def"},
 	}
@@ -69,13 +69,13 @@ func TestT20_PeersReply_Populated(t *testing.T) {
 	assert.Contains(t, reply.PeerAddrs, "/ip4/5.6.7.8/p2p/def")
 }
 
-func TestT21_Args_ZeroValue(t *testing.T) {
+func Test_Args_ZeroValue(t *testing.T) {
 	args := Args{}
 	// Args is an empty struct — verify zero value creation
 	assert.Equal(t, Args{}, args)
 }
 
-func TestT21_RouteArgs(t *testing.T) {
+func Test_RouteArgs(t *testing.T) {
 	routeArgs := RouteArgs{
 		Action: Show,
 		Args:   []string{"show"},

@@ -17,9 +17,14 @@ type mockStream struct {
 	writeData  [][]byte
 	closeCalls int
 	deadlineErr error
+	readErr    error
+	writeErr   error
 }
 
 func (m *mockStream) Read(b []byte) (int, error) {
+	if m.readErr != nil {
+		return 0, m.readErr
+	}
 	if m.readIdx >= len(m.readData) {
 		return 0, io.EOF
 	}
@@ -29,6 +34,9 @@ func (m *mockStream) Read(b []byte) (int, error) {
 }
 
 func (m *mockStream) Write(b []byte) (int, error) {
+	if m.writeErr != nil {
+		return 0, m.writeErr
+	}
 	m.writeData = append(m.writeData, append([]byte(nil), b...))
 	return len(b), nil
 }
@@ -52,7 +60,7 @@ func (m *mockStream) Stat() network.Stats      { return network.Stats{} }
 func (m *mockStream) Conn() network.Conn       { return nil }
 func (m *mockStream) Scope() network.StreamScope { return nil }
 
-func TestT9_StreamWrapper_Read(t *testing.T) {
+func Test_StreamWrapper_Read(t *testing.T) {
 	mock := &mockStream{readData: []byte("hello world")}
 	sw := StreamWrapper{Stream: mock}
 
@@ -63,7 +71,7 @@ func TestT9_StreamWrapper_Read(t *testing.T) {
 	assert.Equal(t, "hello world", string(buf[:n]))
 }
 
-func TestT9_StreamWrapper_Read_EOF(t *testing.T) {
+func Test_StreamWrapper_Read_EOF(t *testing.T) {
 	mock := &mockStream{readData: []byte("hi")}
 	sw := StreamWrapper{Stream: mock}
 
@@ -78,7 +86,7 @@ func TestT9_StreamWrapper_Read_EOF(t *testing.T) {
 	assert.ErrorIs(t, err, io.EOF)
 }
 
-func TestT10_StreamWrapper_Write(t *testing.T) {
+func Test_StreamWrapper_Write(t *testing.T) {
 	mock := &mockStream{}
 	sw := StreamWrapper{Stream: mock}
 
@@ -89,7 +97,7 @@ func TestT10_StreamWrapper_Write(t *testing.T) {
 	assert.Equal(t, []byte("test data"), mock.writeData[0])
 }
 
-func TestT10_StreamWrapper_Write_Multiple(t *testing.T) {
+func Test_StreamWrapper_Write_Multiple(t *testing.T) {
 	mock := &mockStream{}
 	sw := StreamWrapper{Stream: mock}
 
@@ -101,7 +109,23 @@ func TestT10_StreamWrapper_Write_Multiple(t *testing.T) {
 	assert.Equal(t, []byte("b"), mock.writeData[1])
 }
 
-func TestT11_StreamWrapper_Close(t *testing.T) {
+func Test_StreamWrapper_Read_Error(t *testing.T) {
+	mock := &mockStream{readErr: io.ErrUnexpectedEOF}
+	sw := StreamWrapper{Stream: mock}
+
+	_, err := sw.Read(make([]byte, 10))
+	assert.ErrorIs(t, err, io.ErrUnexpectedEOF)
+}
+
+func Test_StreamWrapper_Write_Error(t *testing.T) {
+	mock := &mockStream{writeErr: io.ErrClosedPipe}
+	sw := StreamWrapper{Stream: mock}
+
+	_, err := sw.Write([]byte("data"))
+	assert.ErrorIs(t, err, io.ErrClosedPipe)
+}
+
+func Test_StreamWrapper_Close(t *testing.T) {
 	mock := &mockStream{}
 	sw := StreamWrapper{Stream: mock}
 
@@ -112,7 +136,7 @@ func TestT11_StreamWrapper_Close(t *testing.T) {
 	assert.Equal(t, 2, mock.closeCalls)
 }
 
-func TestT12_StreamWrapper_Deadlines(t *testing.T) {
+func Test_StreamWrapper_Deadlines(t *testing.T) {
 	mock := &mockStream{deadlineErr: io.ErrClosedPipe}
 	sw := StreamWrapper{Stream: mock}
 
@@ -121,7 +145,7 @@ func TestT12_StreamWrapper_Deadlines(t *testing.T) {
 	assert.ErrorIs(t, sw.SetWriteDeadline(time.Now()), io.ErrClosedPipe)
 }
 
-func TestT13_StreamWrapper_WrapStream(t *testing.T) {
+func Test_StreamWrapper_WrapStream(t *testing.T) {
 	mock := &mockStream{}
 	sw := StreamWrapper{Stream: mock}
 

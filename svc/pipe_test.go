@@ -58,30 +58,21 @@ func (p *bytePipe) signalEOF() {
 	p.tx <- nil
 }
 
-// collectFrom reads exactly n items from pipeB's rx channel, with a timeout.
+// collectFrom reads exactly n items from pipeB's rx channel, using a done signal for synchronization.
+// timeout is a safety net to prevent tests from hanging forever.
 func collectFrom(p *bytePipe, n int, timeout time.Duration) ([][]byte, error) {
 	var results [][]byte
 	done := make(chan struct{})
 
 	go func() {
+		defer close(done)
 		for len(results) < n {
-			p.mu.Lock()
-			closed := p.closed
-			p.mu.Unlock()
-			if closed && len(results) > 0 {
-				break
-			}
-			select {
-			case data := <-p.rx:
-				if data == nil {
-					return
-				}
-				results = append(results, append([]byte(nil), data...))
-			case <-time.After(timeout):
+			data, ok := <-p.rx
+			if !ok || data == nil {
 				return
 			}
+			results = append(results, append([]byte(nil), data...))
 		}
-		done <- struct{}{}
 	}()
 
 	select {
@@ -92,7 +83,7 @@ func collectFrom(p *bytePipe, n int, timeout time.Duration) ([][]byte, error) {
 	}
 }
 
-func TestT6_pipe_singleDirection(t *testing.T) {
+func Test_pipe_singleDirection(t *testing.T) {
 	pipeA := newBytePipe()
 	pipeB := newBytePipe()
 
@@ -111,7 +102,7 @@ func TestT6_pipe_singleDirection(t *testing.T) {
 	assert.Equal(t, []byte(" world"), dataB[1])
 }
 
-func TestT6_pipe_singleDirection_EOF(t *testing.T) {
+func Test_pipe_singleDirection_EOF(t *testing.T) {
 	pipeA := newBytePipe()
 	pipeB := newBytePipe()
 
@@ -141,7 +132,7 @@ func TestT6_pipe_singleDirection_EOF(t *testing.T) {
 	}
 }
 
-func TestT7_pipe_bidirectional(t *testing.T) {
+func Test_pipe_bidirectional(t *testing.T) {
 	pipeA := newBytePipe()
 	pipeB := newBytePipe()
 
@@ -171,7 +162,7 @@ func TestT7_pipe_bidirectional(t *testing.T) {
 	assert.Equal(t, []byte("from B"), dataA[0])
 }
 
-func TestT7_pipe_interleaving(t *testing.T) {
+func Test_pipe_interleaving(t *testing.T) {
 	pipeA := newBytePipe()
 	pipeB := newBytePipe()
 
@@ -206,7 +197,7 @@ func TestT7_pipe_interleaving(t *testing.T) {
 	assert.Equal(t, []byte("d"), dataA[1])
 }
 
-func TestT7_pipe_no_leak_on_block(t *testing.T) {
+func Test_pipe_no_leak_on_block(t *testing.T) {
 	pipeA := newBytePipe()
 	pipeB := newBytePipe()
 
@@ -240,36 +231,28 @@ func TestT7_pipe_no_leak_on_block(t *testing.T) {
 	}
 }
 
-func TestT8_toChan_produces_data(t *testing.T) {
+func Test_toChan_produces_data(t *testing.T) {
 	pipe := newBytePipe()
 	ch := toChan(pipe)
 
 	pipe.send([]byte("hello"))
 	pipe.send([]byte(" world"))
+	pipe.signalEOF() // Cleanly terminate the toChan goroutine
 
-	// Collect from channel with timeout (toChan blocks on Read, so we need a timeout)
 	var results [][]byte
 	for data := range ch {
 		if data == nil {
 			break
 		}
 		results = append(results, append([]byte(nil), data...))
-		if len(results) == 2 {
-			break
-		}
 	}
-	// If the range didn't close, close it manually after timeout
-	go func() {
-		time.Sleep(500 * time.Millisecond)
-		// Channel will be garbage-collected; toChan goroutine is blocked but test ends
-	}()
 
 	require.Len(t, results, 2)
 	assert.Equal(t, []byte("hello"), results[0])
 	assert.Equal(t, []byte(" world"), results[1])
 }
 
-func TestT8_toChan_EOF_closes_channel(t *testing.T) {
+func Test_toChan_EOF_closes_channel(t *testing.T) {
 	pipe := newBytePipe()
 
 	ch := toChan(pipe)

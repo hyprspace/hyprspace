@@ -16,11 +16,11 @@
             };
         in
         {
-          format-nix = pkgs.runCommandNoCC "format-nix" { } ''
+          format-nix = pkgs.runCommand "format-nix" { } ''
             ${lib.getExe config.formatter} -c ${filesWithExtension "nix"}
             touch $out
           '';
-          format-go = pkgs.runCommandNoCC "format-go" { } ''
+          format-go = pkgs.runCommand "format-go" { } ''
             test "$(${lib.getExe' pkgs.go "gofmt"} -l ${filesWithExtension "go"} | tee /dev/stderr | wc -l)" == 0
             touch $out
           '';

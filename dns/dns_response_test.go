@@ -12,42 +12,42 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestT22_domainSuffix_hyprspace(t *testing.T) {
+func Test_domainSuffix_hyprspace(t *testing.T) {
 	cfg := config.Config{Interface: "hyprspace"}
 	assert.Equal(t, "hyprspace.", domainSuffix(cfg))
 }
 
-func TestT22_domainSuffix_custom(t *testing.T) {
+func Test_domainSuffix_custom(t *testing.T) {
 	cfg := config.Config{Interface: "hs0"}
 	assert.Equal(t, "hs0.hyprspace.", domainSuffix(cfg))
 }
 
-func TestT22_domainSuffix_other(t *testing.T) {
+func Test_domainSuffix_other(t *testing.T) {
 	cfg := config.Config{Interface: "myvpn"}
 	assert.Equal(t, "myvpn.hyprspace.", domainSuffix(cfg))
 }
 
-func TestT22_domainSuffix_empty(t *testing.T) {
+func Test_domainSuffix_empty(t *testing.T) {
 	cfg := config.Config{Interface: ""}
 	assert.Equal(t, ".hyprspace.", domainSuffix(cfg))
 }
 
-func TestT23_withDomainSuffix(t *testing.T) {
+func Test_withDomainSuffix(t *testing.T) {
 	cfg := config.Config{Interface: "hyprspace"}
 	assert.Equal(t, "alice.hyprspace.", withDomainSuffix(cfg, "alice"))
 }
 
-func TestT23_withDomainSuffix_customInterface(t *testing.T) {
+func Test_withDomainSuffix_customInterface(t *testing.T) {
 	cfg := config.Config{Interface: "hs0"}
 	assert.Equal(t, "bob.hs0.hyprspace.", withDomainSuffix(cfg, "bob"))
 }
 
-func TestT23_withDomainSuffix_servicePrefix(t *testing.T) {
+func Test_withDomainSuffix_servicePrefix(t *testing.T) {
 	cfg := config.Config{Interface: "hs0"}
 	assert.Equal(t, "http.alice.hs0.hyprspace.", withDomainSuffix(cfg, "http.alice"))
 }
 
-func TestT24_mkAliasRecord_emptyService(t *testing.T) {
+func Test_mkAliasRecord_emptyService(t *testing.T) {
 	cfg := config.Config{Interface: "hs0"}
 	pk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
 	require.NoError(t, err)
@@ -64,7 +64,7 @@ func TestT24_mkAliasRecord_emptyService(t *testing.T) {
 	assert.Contains(t, record.Target, "hs0.hyprspace.", "CNAME target should contain domain suffix")
 }
 
-func TestT24_mkAliasRecord_withService(t *testing.T) {
+func Test_mkAliasRecord_withService(t *testing.T) {
 	cfg := config.Config{Interface: "hs0"}
 	pk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
 	require.NoError(t, err)
@@ -78,7 +78,27 @@ func TestT24_mkAliasRecord_withService(t *testing.T) {
 	assert.Contains(t, record.Target, "hs0.hyprspace.")
 }
 
-func TestT25_mkIDRecord4(t *testing.T) {
+func Test_mkAliasRecord_emptyName(t *testing.T) {
+	cfg := config.Config{Interface: "hs0"}
+	pk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
+	require.NoError(t, err)
+	pid, err := peer.IDFromPrivateKey(pk)
+	require.NoError(t, err)
+
+	// Empty alias name should still produce a valid CNAME record
+	// The Hdr.Name will be just the domain suffix ("hs0.hyprspace.")
+	// because withDomainSuffix("", "") = ".hs0.hyprspace."
+	record := mkAliasRecord(cfg, "", "", pid)
+
+	assert.Equal(t, uint16(dns.TypeCNAME), record.Hdr.Rrtype)
+	assert.Equal(t, uint16(dns.ClassINET), record.Hdr.Class)
+	assert.Equal(t, uint32(0), record.Hdr.Ttl)
+	assert.True(t, len(record.Hdr.Name) > 0, "CNAME name should not be empty")
+	assert.True(t, len(record.Target) > 0, "CNAME target should not be empty")
+	assert.Contains(t, record.Target, "hs0.hyprspace.", "CNAME target should contain domain suffix")
+}
+
+func Test_mkIDRecord4(t *testing.T) {
 	cfg := config.Config{Interface: "hs0"}
 	pk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
 	require.NoError(t, err)
@@ -96,7 +116,25 @@ func TestT25_mkIDRecord4(t *testing.T) {
 	assert.Contains(t, record.Hdr.Name, "hs0.hyprspace.")
 }
 
-func TestT26_mkIDRecord6_noService(t *testing.T) {
+func Test_mkIDRecord4_nilAddress(t *testing.T) {
+	cfg := config.Config{Interface: "hs0"}
+	pk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
+	require.NoError(t, err)
+	pid, err := peer.IDFromPrivateKey(pk)
+	require.NoError(t, err)
+
+	// nil address — mkIDRecord4 calls addr.To4() which returns nil for nil input
+	// The record is still created, but A field is nil
+	record := mkIDRecord4(cfg, pid, nil)
+
+	assert.Equal(t, uint16(dns.TypeA), record.Hdr.Rrtype)
+	assert.Equal(t, uint16(dns.ClassINET), record.Hdr.Class)
+	assert.Equal(t, uint32(86400), record.Hdr.Ttl)
+	assert.Nil(t, record.A, "A record with nil address should have nil A field")
+	assert.Contains(t, record.Hdr.Name, "hs0.hyprspace.")
+}
+
+func Test_mkIDRecord6_noService(t *testing.T) {
 	cfg := config.Config{Interface: "hs0"}
 	pk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
 	require.NoError(t, err)
@@ -113,7 +151,7 @@ func TestT26_mkIDRecord6_noService(t *testing.T) {
 	assert.Contains(t, record.Hdr.Name, "hs0.hyprspace.")
 }
 
-func TestT26_mkIDRecord6_withService(t *testing.T) {
+func Test_mkIDRecord6_withService(t *testing.T) {
 	cfg := config.Config{Interface: "hs0"}
 	pk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
 	require.NoError(t, err)
@@ -130,7 +168,7 @@ func TestT26_mkIDRecord6_withService(t *testing.T) {
 	assert.Equal(t, svcAddr.To16(), record.AAAA)
 }
 
-func TestT27_writeResponse(t *testing.T) {
+func Test_writeResponse(t *testing.T) {
 	pk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
 	require.NoError(t, err)
 	pid, err := peer.IDFromPrivateKey(pk)
@@ -161,7 +199,7 @@ func TestT27_writeResponse(t *testing.T) {
 	assert.Contains(t, txtRecord.Txt[0], pid.String())
 }
 
-func TestT27_writeResponse_MultipleQuestions(t *testing.T) {
+func Test_writeResponse_MultipleQuestions(t *testing.T) {
 	pk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
 	require.NoError(t, err)
 	pid, err := peer.IDFromPrivateKey(pk)
@@ -191,17 +229,17 @@ func TestT27_writeResponse_MultipleQuestions(t *testing.T) {
 	assert.Equal(t, 2, len(msg.Extra[1].(*dns.TXT).Txt))
 }
 
-func TestT27_writeResponse_UnknownType(t *testing.T) {
+func Test_writeResponse_UnknownType(t *testing.T) {
 	msg := new(dns.Msg)
 	q := dns.Question{Name: "test.", Qtype: dns.TypeMX}
 	addr := net.ParseIP("100.64.1.2")
 
-	// writeResponse always adds an A record regardless of qtype — the no-op
-	// behavior for unknown types happens in the server switch, not in writeResponse.
-	// Verify that writeResponse itself adds an A record with the correct TTL.
+	// writeResponse is a helper that always adds an A+TXT record regardless of qtype.
+	// The server's switch statement handles qtype filtering before calling writeResponse,
+	// so writeResponse itself is intentionally agnostic to qtype.
 	writeResponse(msg, q, peer.ID("dummy"), addr)
 
-	require.Len(t, msg.Answer, 1, "writeResponse should still produce an A record")
+	require.Len(t, msg.Answer, 1, "writeResponse always produces an A record regardless of qtype")
 	aRecord, ok := msg.Answer[0].(*dns.A)
 	require.True(t, ok)
 	assert.Equal(t, "test.", aRecord.Hdr.Name)

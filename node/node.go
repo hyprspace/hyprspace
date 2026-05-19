@@ -142,6 +142,7 @@ func (node *Node) Run() error {
 		node.ctx,
 		node.cfg.PrivateKey,
 		node.cfg.ListenAddresses,
+		node.cfg.BootstrapPeers,
 		node.streamHandler,
 		p2p.NewClosedCircuitRelayFilter(node.cfg.Peers),
 		gater,

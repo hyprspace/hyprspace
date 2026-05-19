@@ -240,6 +240,9 @@ func FindPeerByIDPrefix(peers []Peer, needle string) (*Peer, error) {
 // otherwise a peer ID prefix. Returns (nil, nil) on no match,
 // (nil, error) only on ambiguous ID prefix.
 func FindPeerByCLIRef(peers []Peer, needle string) (*Peer, error) {
+	if needle == "" {
+		return nil, nil
+	}
 	if strings.HasPrefix(needle, "@") {
 		name := strings.TrimPrefix(needle, "@")
 		p, _ := FindPeerByName(peers, name)

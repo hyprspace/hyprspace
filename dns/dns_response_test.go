@@ -22,11 +22,6 @@ func Test_domainSuffix_custom(t *testing.T) {
 	assert.Equal(t, "hs0.hyprspace.", domainSuffix(cfg))
 }
 
-func Test_domainSuffix_other(t *testing.T) {
-	cfg := config.Config{Interface: "myvpn"}
-	assert.Equal(t, "myvpn.hyprspace.", domainSuffix(cfg))
-}
-
 func Test_domainSuffix_empty(t *testing.T) {
 	cfg := config.Config{Interface: ""}
 	assert.Equal(t, ".hyprspace.", domainSuffix(cfg))

@@ -30,16 +30,15 @@
         ]
       },
       "locked": {
-        "lastModified": 1776270251,
-        "narHash": "sha256-3A2B8k6YCuzt5pT/CQEltUghtE6heSlk2tMYkg/fUWI=",
-        "owner": "max-privatevoid",
+        "lastModified": 1778930899,
+        "narHash": "sha256-OOEWyt8ma7QAysDbiP65J7li7KIdtZfnbA11gFnwyEI=",
+        "owner": "hercules-ci",
         "repo": "hercules-ci-effects",
-        "rev": "f3a32947c119cfe0f0130ad91b37028a3dae22d1",
+        "rev": "af4331c44f13977b6964745454eadcfee2d244d1",
         "type": "github"
       },
       "original": {
-        "owner": "max-privatevoid",
-        "ref": "pr/skip-if-exists",
+        "owner": "hercules-ci",
         "repo": "hercules-ci-effects",
         "type": "github"
       }

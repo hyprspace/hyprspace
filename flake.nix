@@ -8,7 +8,7 @@
       inputs.nixpkgs-lib.follows = "nixpkgs";
     };
     hercules-ci-effects = {
-      url = "github:max-privatevoid/hercules-ci-effects/pr/skip-if-exists";
+      url = "github:hercules-ci/hercules-ci-effects";
       inputs = {
         nixpkgs.follows = "nixpkgs";
         flake-parts.follows = "flake-parts";
@@ -27,7 +27,6 @@
         "x86_64-linux"
         "aarch64-linux"
         "aarch64-darwin"
-        "x86_64-darwin"
       ];
       herculesCI.ciSystems = [
         "x86_64-linux"

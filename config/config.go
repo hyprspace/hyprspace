@@ -166,15 +166,21 @@ func Read(path string) (*Config, error) {
 		whitelist := make(map[peer.ID]struct{})
 		blacklist := make(map[peer.ID]struct{})
 		for _, p := range service.Acl.Whitelist {
-			cfgPeer, found := FindPeerByCLIRef(result.Peers, p)
-			if !found {
+			cfgPeer, err := FindPeerByCLIRef(result.Peers, p)
+			if err != nil {
+				return nil, err
+			}
+			if cfgPeer == nil {
 				return nil, errors.New("unknown peer: " + p)
 			}
 			whitelist[cfgPeer.ID] = struct{}{}
 		}
 		for _, peerStr := range service.Acl.Blacklist {
-			cfgPeer, found := FindPeerByCLIRef(result.Peers, peerStr)
-			if !found {
+			cfgPeer, err := FindPeerByCLIRef(result.Peers, peerStr)
+			if err != nil {
+				return nil, err
+			}
+			if cfgPeer == nil {
 				return nil, errors.New("unknown peer: " + peerStr)
 			}
 			blacklist[cfgPeer.ID] = struct{}{}
@@ -212,22 +218,34 @@ func FindPeerByName(peers []Peer, needle string) (*Peer, bool) {
 	return nil, false
 }
 
-func FindPeerByIDPrefix(peers []Peer, needle string) (*Peer, bool) {
-	for _, p := range peers {
-		if strings.HasPrefix(p.ID.String(), needle) {
-			return &p, true
+// FindPeerByIDPrefix returns the unique peer whose ID starts with needle.
+// Returns (nil, nil) if no peer matches.
+// Returns (nil, error) if more than one peer matches (ambiguous prefix).
+func FindPeerByIDPrefix(peers []Peer, needle string) (*Peer, error) {
+	var match *Peer
+	count := 0
+	for i := range peers {
+		if strings.HasPrefix(peers[i].ID.String(), needle) {
+			match = &peers[i]
+			count++
 		}
 	}
-	return nil, false
+	if count > 1 {
+		return nil, fmt.Errorf("ambiguous peer prefix %q matches %d peers", needle, count)
+	}
+	return match, nil
 }
 
-func FindPeerByCLIRef(peers []Peer, needle string) (*Peer, bool) {
+// FindPeerByCLIRef resolves a CLI peer reference: "@name" for name lookup,
+// otherwise a peer ID prefix. Returns (nil, nil) on no match,
+// (nil, error) only on ambiguous ID prefix.
+func FindPeerByCLIRef(peers []Peer, needle string) (*Peer, error) {
 	if strings.HasPrefix(needle, "@") {
 		name := strings.TrimPrefix(needle, "@")
-		return FindPeerByName(peers, name)
-	} else {
-		return FindPeerByIDPrefix(peers, needle)
+		p, _ := FindPeerByName(peers, name)
+		return p, nil
 	}
+	return FindPeerByIDPrefix(peers, needle)
 }
 
 func (cfg Config) FindRoute(needle net.IPNet) (*RouteTableEntry, bool) {

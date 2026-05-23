@@ -120,8 +120,11 @@ func (hsr *HyprspaceRPC) Route(args *RouteArgs, reply *RouteReply) error {
 		if err != nil {
 			return err
 		}
-		target, found := config.FindPeerByCLIRef(hsr.config.Peers, args.Args[1])
-		if !found {
+		target, err := config.FindPeerByCLIRef(hsr.config.Peers, args.Args[1])
+		if err != nil {
+			return err
+		}
+		if target == nil {
 			return errors.New("no such peer")
 		}
 		err = hsr.tunDev.Apply(tun.Route(*network))

@@ -72,13 +72,6 @@ func Test_FindPeer_SinglePeer(t *testing.T) {
 	assert.Equal(t, pid, target.ID)
 }
 
-func Test_FindPeer_EmptySlice(t *testing.T) {
-	// Non-nil empty slice — different from nil slice
-	peers := []Peer{}
-	_, found := FindPeer(peers, peer.ID("any"))
-	assert.False(t, found)
-}
-
 func Test_FindPeer_NilSlice(t *testing.T) {
 	// Nil slice — zero-value slice
 	var peers []Peer

@@ -118,15 +118,24 @@ func Test_mkIDRecord4_nilAddress(t *testing.T) {
 	pid, err := peer.IDFromPrivateKey(pk)
 	require.NoError(t, err)
 
-	// nil address — mkIDRecord4 calls addr.To4() which returns nil for nil input
-	// The record is still created, but A field is nil
 	record := mkIDRecord4(cfg, pid, nil)
 
+	// Record structure is still valid
 	assert.Equal(t, uint16(dns.TypeA), record.Hdr.Rrtype)
 	assert.Equal(t, uint16(dns.ClassINET), record.Hdr.Class)
 	assert.Equal(t, uint32(86400), record.Hdr.Ttl)
 	assert.Nil(t, record.A, "A record with nil address should have nil A field")
 	assert.Contains(t, record.Hdr.Name, "hs0.hyprspace.")
+
+	// Verify the DNS library handles nil A fields without panicking on write.
+	// This exercises the live WriteMsg/Pack path, which is the actual production
+	// code path used by the DNS server when BuiltinAddr4 is unexpectedly nil.
+	msg := new(dns.Msg)
+	msg.SetReply(new(dns.Msg))
+	msg.Answer = append(msg.Answer, record)
+	buf, err := msg.Pack()
+	require.NoError(t, err)
+	assert.NotNil(t, buf, "DNS library should serialize message without panicking on nil A")
 }
 
 func Test_mkIDRecord6_noService(t *testing.T) {

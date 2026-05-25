@@ -169,26 +169,6 @@ func Test_MkServiceAddr6_DifferentServices(t *testing.T) {
 	assert.NotEqual(t, addrHTTP, addrSSH, "Different services should produce different addresses")
 }
 
-func Test_MkServiceAddr6_DifferentPeers(t *testing.T) {
-	ids := make([]peer.ID, 5)
-	for i := 0; i < 5; i++ {
-		pk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
-		require.NoError(t, err)
-		ids[i], err = peer.IDFromPrivateKey(pk)
-		require.NoError(t, err)
-	}
-
-	addrs := make(map[string]bool)
-	for _, pid := range ids {
-		addr := MkServiceAddr6(pid, "http")
-		addrStr := addr.String()
-		assert.False(t, addrs[addrStr], "MkServiceAddr6 collision for peer %s: %s", pid, addrStr)
-		addrs[addrStr] = true
-	}
-
-	assert.Equal(t, 5, len(addrs), "All 5 peers should have unique service addresses")
-}
-
 func Test_MkServiceAddr6_CollisionResistance(t *testing.T) {
 	ids := make([]peer.ID, 10)
 	for i := 0; i < 10; i++ {

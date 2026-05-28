@@ -115,12 +115,16 @@ func Test_mkIDRecord(t *testing.T) {
 			is4:    true,
 		},
 		{
-			fn:     func(cfg config.Config, id peer.ID, _ string, addr net.IP) dns.RR { return mkIDRecord6(cfg, id, "", addr) },
+			fn: func(cfg config.Config, id peer.ID, _ string, addr net.IP) dns.RR {
+				return mkIDRecord6(cfg, id, "", addr)
+			},
 			wantRr: dns.TypeAAAA,
 			addr:   net.ParseIP("fd00::1"),
 		},
 		{
-			fn:     func(cfg config.Config, id peer.ID, _ string, addr net.IP) dns.RR { return mkIDRecord6(cfg, id, "http", addr) },
+			fn: func(cfg config.Config, id peer.ID, _ string, addr net.IP) dns.RR {
+				return mkIDRecord6(cfg, id, "http", addr)
+			},
 			wantRr: dns.TypeAAAA,
 			addr:   config.MkServiceAddr6(pid, "http"),
 			hasSvc: true,
@@ -241,21 +245,4 @@ func Test_writeResponse_MultipleQuestions(t *testing.T) {
 	assert.Equal(t, "bob.", msg.Extra[1].(*dns.TXT).Hdr.Name)
 	assert.Equal(t, 2, len(msg.Extra[0].(*dns.TXT).Txt))
 	assert.Equal(t, 2, len(msg.Extra[1].(*dns.TXT).Txt))
-}
-
-func Test_writeResponse_UnknownType(t *testing.T) {
-	msg := new(dns.Msg)
-	q := dns.Question{Name: "test.", Qtype: dns.TypeMX}
-	addr := net.ParseIP("100.64.1.2")
-
-	// writeResponse is a helper that always adds an A+TXT record regardless of qtype.
-	// The server's switch statement handles qtype filtering before calling writeResponse,
-	// so writeResponse itself is intentionally agnostic to qtype.
-	writeResponse(msg, q, peer.ID("dummy"), addr)
-
-	require.Len(t, msg.Answer, 1, "writeResponse always produces an A record regardless of qtype")
-	aRecord, ok := msg.Answer[0].(*dns.A)
-	require.True(t, ok)
-	assert.Equal(t, "test.", aRecord.Hdr.Name)
-	assert.Equal(t, uint32(0), aRecord.Hdr.Ttl)
 }

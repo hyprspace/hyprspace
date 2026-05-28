@@ -12,34 +12,34 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func Test_domainSuffix_hyprspace(t *testing.T) {
-	cfg := config.Config{Interface: "hyprspace"}
-	assert.Equal(t, "hyprspace.", domainSuffix(cfg))
-}
-
-func Test_domainSuffix_custom(t *testing.T) {
-	cfg := config.Config{Interface: "hs0"}
-	assert.Equal(t, "hs0.hyprspace.", domainSuffix(cfg))
-}
-
-func Test_domainSuffix_empty(t *testing.T) {
-	cfg := config.Config{Interface: ""}
-	assert.Equal(t, ".hyprspace.", domainSuffix(cfg))
+func Test_domainSuffix(t *testing.T) {
+	tests := []struct {
+		iface, want string
+	}{
+		{"hyprspace", "hyprspace."},
+		{"hs0", "hs0.hyprspace."},
+		{"", ".hyprspace."},
+	}
+	for _, tt := range tests {
+		t.Run(tt.iface, func(t *testing.T) {
+			assert.Equal(t, tt.want, domainSuffix(config.Config{Interface: tt.iface}))
+		})
+	}
 }
 
 func Test_withDomainSuffix(t *testing.T) {
-	cfg := config.Config{Interface: "hyprspace"}
-	assert.Equal(t, "alice.hyprspace.", withDomainSuffix(cfg, "alice"))
-}
-
-func Test_withDomainSuffix_customInterface(t *testing.T) {
-	cfg := config.Config{Interface: "hs0"}
-	assert.Equal(t, "bob.hs0.hyprspace.", withDomainSuffix(cfg, "bob"))
-}
-
-func Test_withDomainSuffix_servicePrefix(t *testing.T) {
-	cfg := config.Config{Interface: "hs0"}
-	assert.Equal(t, "http.alice.hs0.hyprspace.", withDomainSuffix(cfg, "http.alice"))
+	tests := []struct {
+		prefix, iface, want string
+	}{
+		{"alice", "hyprspace", "alice.hyprspace."},
+		{"bob", "hs0", "bob.hs0.hyprspace."},
+		{"http.alice", "hs0", "http.alice.hs0.hyprspace."},
+	}
+	for _, tt := range tests {
+		t.Run(tt.iface, func(t *testing.T) {
+			assert.Equal(t, tt.want, withDomainSuffix(config.Config{Interface: tt.iface}, tt.prefix))
+		})
+	}
 }
 
 func Test_mkAliasRecord_emptyService(t *testing.T) {
@@ -93,25 +93,69 @@ func Test_mkAliasRecord_emptyName(t *testing.T) {
 	assert.Contains(t, record.Target, "hs0.hyprspace.", "CNAME target should contain domain suffix")
 }
 
-func Test_mkIDRecord4(t *testing.T) {
-	cfg := config.Config{Interface: "hs0"}
+func Test_mkIDRecord(t *testing.T) {
 	pk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
 	require.NoError(t, err)
 	pid, err := peer.IDFromPrivateKey(pk)
 	require.NoError(t, err)
 
-	// Derive builtin addr for this peer to pass in
-	addr := net.ParseIP("100.64.1.2")
-	record := mkIDRecord4(cfg, pid, addr)
+	type testCase struct {
+		fn     func(config.Config, peer.ID, string, net.IP) dns.RR
+		wantRr uint16
+		addr   net.IP
+		is4    bool
+		hasSvc bool
+	}
 
-	assert.Equal(t, uint16(dns.TypeA), record.Hdr.Rrtype)
-	assert.Equal(t, uint16(dns.ClassINET), record.Hdr.Class)
-	assert.Equal(t, uint32(86400), record.Hdr.Ttl)
-	assert.Equal(t, addr.To4(), record.A)
-	assert.Contains(t, record.Hdr.Name, "hs0.hyprspace.")
+	tests := []testCase{
+		{
+			fn:     func(cfg config.Config, id peer.ID, _ string, addr net.IP) dns.RR { return mkIDRecord4(cfg, id, addr) },
+			wantRr: dns.TypeA,
+			addr:   net.ParseIP("100.64.1.2"),
+			is4:    true,
+		},
+		{
+			fn:     func(cfg config.Config, id peer.ID, _ string, addr net.IP) dns.RR { return mkIDRecord6(cfg, id, "", addr) },
+			wantRr: dns.TypeAAAA,
+			addr:   net.ParseIP("fd00::1"),
+		},
+		{
+			fn:     func(cfg config.Config, id peer.ID, _ string, addr net.IP) dns.RR { return mkIDRecord6(cfg, id, "http", addr) },
+			wantRr: dns.TypeAAAA,
+			addr:   config.MkServiceAddr6(pid, "http"),
+			hasSvc: true,
+		},
+	}
+
+	for i, tt := range tests {
+		name := []string{"ipv4", "ipv6", "ipv6-svc"}[i]
+		t.Run(name, func(t *testing.T) {
+			cfg := config.Config{Interface: "hs0"}
+			record := tt.fn(cfg, pid, "", tt.addr)
+
+			hdr := record.Header()
+			assert.Equal(t, tt.wantRr, hdr.Rrtype)
+			assert.Equal(t, uint16(dns.ClassINET), hdr.Class)
+			assert.Equal(t, uint32(86400), hdr.Ttl)
+			assert.Contains(t, hdr.Name, "hs0.hyprspace.")
+
+			if tt.is4 {
+				aRecord, ok := record.(*dns.A)
+				require.True(t, ok)
+				assert.Equal(t, tt.addr.To4(), aRecord.A)
+			} else {
+				aaaaRecord, ok := record.(*dns.AAAA)
+				require.True(t, ok)
+				assert.Equal(t, tt.addr.To16(), aaaaRecord.AAAA)
+			}
+			if tt.hasSvc {
+				assert.Contains(t, hdr.Name, "http.")
+			}
+		})
+	}
 }
 
-func Test_mkIDRecord4_nilAddress(t *testing.T) {
+func Test_mkIDRecord_nil_addr(t *testing.T) {
 	cfg := config.Config{Interface: "hs0"}
 	pk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
 	require.NoError(t, err)
@@ -136,40 +180,6 @@ func Test_mkIDRecord4_nilAddress(t *testing.T) {
 	buf, err := msg.Pack()
 	require.NoError(t, err)
 	assert.NotNil(t, buf, "DNS library should serialize message without panicking on nil A")
-}
-
-func Test_mkIDRecord6_noService(t *testing.T) {
-	cfg := config.Config{Interface: "hs0"}
-	pk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
-	require.NoError(t, err)
-	pid, err := peer.IDFromPrivateKey(pk)
-	require.NoError(t, err)
-
-	addr := net.ParseIP("fd00::1")
-	record := mkIDRecord6(cfg, pid, "", addr)
-
-	assert.Equal(t, uint16(dns.TypeAAAA), record.Hdr.Rrtype)
-	assert.Equal(t, uint16(dns.ClassINET), record.Hdr.Class)
-	assert.Equal(t, uint32(86400), record.Hdr.Ttl)
-	assert.Equal(t, addr.To16(), record.AAAA)
-	assert.Contains(t, record.Hdr.Name, "hs0.hyprspace.")
-}
-
-func Test_mkIDRecord6_withService(t *testing.T) {
-	cfg := config.Config{Interface: "hs0"}
-	pk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
-	require.NoError(t, err)
-	pid, err := peer.IDFromPrivateKey(pk)
-	require.NoError(t, err)
-
-	// Create a service-scoped address
-	svcAddr := config.MkServiceAddr6(pid, "http")
-	record := mkIDRecord6(cfg, pid, "http", svcAddr)
-
-	assert.Equal(t, uint16(dns.TypeAAAA), record.Hdr.Rrtype)
-	assert.Contains(t, record.Hdr.Name, "http.")
-	assert.Contains(t, record.Hdr.Name, "hs0.hyprspace.")
-	assert.Equal(t, svcAddr.To16(), record.AAAA)
 }
 
 func Test_writeResponse(t *testing.T) {

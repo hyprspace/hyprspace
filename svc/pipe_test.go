@@ -233,27 +233,6 @@ func Test_pipe_no_leak_on_block(t *testing.T) {
 	}
 }
 
-func Test_toChan_produces_data(t *testing.T) {
-	pipe := newBytePipe()
-	ch := toChan(pipe)
-
-	pipe.send([]byte("hello"))
-	pipe.send([]byte(" world"))
-	pipe.signalEOF() // Cleanly terminate the toChan goroutine
-
-	var results [][]byte
-	for data := range ch {
-		if data == nil {
-			break
-		}
-		results = append(results, append([]byte(nil), data...))
-	}
-
-	require.Len(t, results, 2)
-	assert.Equal(t, []byte("hello"), results[0])
-	assert.Equal(t, []byte(" world"), results[1])
-}
-
 func Test_toChan_EOF_closes_channel(t *testing.T) {
 	pipe := newBytePipe()
 

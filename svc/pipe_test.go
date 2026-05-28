@@ -83,53 +83,55 @@ func collectFrom(p *bytePipe, n int, timeout time.Duration) ([][]byte, error) {
 	}
 }
 
-func Test_pipe_singleDirection(t *testing.T) {
-	pipeA := newBytePipe()
-	pipeB := newBytePipe()
+func Test_pipe_flow(t *testing.T) {
+	t.Run("data only", func(t *testing.T) {
+		pipeA := newBytePipe()
+		pipeB := newBytePipe()
 
-	pipeA.rx = pipeB.tx
-	pipeB.rx = pipeA.tx
+		pipeA.rx = pipeB.tx
+		pipeB.rx = pipeA.tx
 
-	go pipe(pipeA, pipeB)
+		go pipe(pipeA, pipeB)
 
-	pipeA.send([]byte("hello"))
-	pipeA.send([]byte(" world"))
+		pipeA.send([]byte("hello"))
+		pipeA.send([]byte(" world"))
 
-	dataB, err := collectFrom(pipeB, 2, 500*time.Millisecond)
-	require.NoError(t, err)
-	require.Len(t, dataB, 2, "pipeB should receive 2 messages")
-	assert.Equal(t, []byte("hello"), dataB[0])
-	assert.Equal(t, []byte(" world"), dataB[1])
-}
+		dataB, err := collectFrom(pipeB, 2, 500*time.Millisecond)
+		require.NoError(t, err)
+		require.Len(t, dataB, 2, "pipeB should receive 2 messages")
+		assert.Equal(t, []byte("hello"), dataB[0])
+		assert.Equal(t, []byte(" world"), dataB[1])
+	})
 
-func Test_pipe_singleDirection_EOF(t *testing.T) {
-	pipeA := newBytePipe()
-	pipeB := newBytePipe()
+	t.Run("with EOF", func(t *testing.T) {
+		pipeA := newBytePipe()
+		pipeB := newBytePipe()
 
-	pipeA.rx = pipeB.tx
-	pipeB.rx = pipeA.tx
+		pipeA.rx = pipeB.tx
+		pipeB.rx = pipeA.tx
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		pipe(pipeA, pipeB)
-	}()
+		var wg sync.WaitGroup
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			pipe(pipeA, pipeB)
+		}()
 
-	pipeA.send([]byte("hello"))
-	pipeA.signalEOF()
+		pipeA.send([]byte("hello"))
+		pipeA.signalEOF()
 
-	done := make(chan struct{})
-	go func() {
-		wg.Wait()
-		close(done)
-	}()
+		done := make(chan struct{})
+		go func() {
+			wg.Wait()
+			close(done)
+		}()
 
-	select {
-	case <-done:
-	case <-time.After(1 * time.Second):
-		t.Fatal("pipe() did not terminate after EOF")
-	}
+		select {
+		case <-done:
+		case <-time.After(1 * time.Second):
+			t.Fatal("pipe() did not terminate after EOF")
+		}
+	})
 }
 
 func Test_pipe_bidirectional(t *testing.T) {

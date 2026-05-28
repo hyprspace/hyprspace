@@ -9,26 +9,26 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func Test_MkNetID_AllZero(t *testing.T) {
-	zeroPeer := peer.ID([]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0})
-
-	// All-zero bytes: XOR with 0 leaves magic bytes unchanged
-	expected := [4]byte{0xde, 0xad, 0xbe, 0xef}
-	result := MkNetID(zeroPeer)
-	assert.Equal(t, expected, result, "MkNetID with all-zero peer should return magic bytes")
-}
-
-func Test_MkNetID_AllFF(t *testing.T) {
-	// MkNetID starts with [0xde, 0xad, 0xbe, 0xef], XORs each byte of peer ID
-	// With exactly 4 bytes of 0xff:
-	//   r[0] = 0xde ^ 0xff = 0x21
-	//   r[1] = 0xad ^ 0xff = 0x52
-	//   r[2] = 0xbe ^ 0xff = 0x41
-	//   r[3] = 0xef ^ 0xff = 0x10
-	ffPeer := peer.ID([]byte{0xff, 0xff, 0xff, 0xff})
-	expected := [4]byte{0x21, 0x52, 0x41, 0x10}
-	result := MkNetID(ffPeer)
-	assert.Equal(t, expected, result, "MkNetID with all-0xFF bytes should XOR correctly")
+func Test_MkNetID_edgeCases(t *testing.T) {
+	t.Run("all zeros", func(t *testing.T) {
+		// All-zero bytes: XOR with 0 leaves magic bytes unchanged
+		zeroPeer := peer.ID([]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0})
+		expected := [4]byte{0xde, 0xad, 0xbe, 0xef}
+		result := MkNetID(zeroPeer)
+		assert.Equal(t, expected, result, "MkNetID with all-zero peer should return magic bytes")
+	})
+	t.Run("all ff", func(t *testing.T) {
+		// MkNetID starts with [0xde, 0xad, 0xbe, 0xef], XORs each byte of peer ID
+		// With exactly 4 bytes of 0xff:
+		//   r[0] = 0xde ^ 0xff = 0x21
+		//   r[1] = 0xad ^ 0xff = 0x52
+		//   r[2] = 0xbe ^ 0xff = 0x41
+		//   r[3] = 0xef ^ 0xff = 0x10
+		ffPeer := peer.ID([]byte{0xff, 0xff, 0xff, 0xff})
+		expected := [4]byte{0x21, 0x52, 0x41, 0x10}
+		result := MkNetID(ffPeer)
+		assert.Equal(t, expected, result, "MkNetID with all-0xFF bytes should XOR correctly")
+	})
 }
 
 func Test_MkNetID_CollisionResistance(t *testing.T) {

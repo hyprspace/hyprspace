@@ -40,3 +40,39 @@ func Route(ifname string, args RouteArgs) RouteReply {
 	}
 	return reply
 }
+
+func TryStatus(ifname string) (StatusReply, error) {
+	client, err := rpc.Dial("unix", fmt.Sprintf("/run/hyprspace-rpc.%s.sock", ifname))
+	if err != nil {
+		return StatusReply{}, err
+	}
+	var reply StatusReply
+	if err := client.Call("HyprspaceRPC.Status", new(Args), &reply); err != nil {
+		return StatusReply{}, err
+	}
+	return reply, nil
+}
+
+func TryPeers(ifname string) (PeersReply, error) {
+	client, err := rpc.Dial("unix", fmt.Sprintf("/run/hyprspace-rpc.%s.sock", ifname))
+	if err != nil {
+		return PeersReply{}, err
+	}
+	var reply PeersReply
+	if err := client.Call("HyprspaceRPC.Peers", new(Args), &reply); err != nil {
+		return PeersReply{}, err
+	}
+	return reply, nil
+}
+
+func TryRoute(ifname string, args RouteArgs) (RouteReply, error) {
+	client, err := rpc.Dial("unix", fmt.Sprintf("/run/hyprspace-rpc.%s.sock", ifname))
+	if err != nil {
+		return RouteReply{}, err
+	}
+	var reply RouteReply
+	if err := client.Call("HyprspaceRPC.Route", args, &reply); err != nil {
+		return RouteReply{}, err
+	}
+	return reply, nil
+}

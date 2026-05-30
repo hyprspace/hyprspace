@@ -34,6 +34,7 @@ func init() {
 	cmd.Register(&Status)
 	cmd.Register(&Peers)
 	cmd.Register(&Route)
+	cmd.Register(&TUI)
 	cmd.Register(&cmd.Version)
 }
 

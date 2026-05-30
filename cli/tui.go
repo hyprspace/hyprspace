@@ -16,14 +16,7 @@ import (
 
 const pollInterval = 2 * time.Second
 
-var tabs = []struct {
-	id    string
-	title string
-}{
-	{"status", "Status"},
-	{"peers", "Peers"},
-	{"routes", "Routes"},
-}
+
 
 // TUI starts the interactive TUI dashboard.
 var TUI = cmd.Sub{
@@ -46,12 +39,6 @@ func runTUI(ifName string) {
 	defer cancel()
 
 	app := tview.NewApplication()
-	pages := tview.NewPages()
-
-	navBar := tview.NewTextView()
-	navBar.SetDynamicColors(true)
-	navBar.SetTextAlign(tview.AlignCenter)
-	navBar.SetTextStyle(tcell.StyleDefault.Background(tcell.ColorDarkSlateGray))
 
 	statusView := tview.NewTextView()
 	statusView.SetDynamicColors(true)
@@ -72,38 +59,18 @@ func runTUI(ifName string) {
 	routesTable.SetBorder(true)
 	routesTable.SetTitle(" Routes ")
 
-	pages.AddPage("status", statusView, true, true)
-	pages.AddPage("peers", peersTable, true, false)
-	pages.AddPage("routes", routesTable, true, false)
-
-	currentTab := 0
-	updateNavBar(navBar, currentTab)
+	bottomFlex := tview.NewFlex().SetDirection(tview.FlexColumn).
+		AddItem(peersTable, 0, 1, false).
+		AddItem(routesTable, 0, 1, false)
 
 	flex := tview.NewFlex().SetDirection(tview.FlexRow).
-		AddItem(navBar, 1, 0, false).
-		AddItem(pages, 0, 1, true)
+		AddItem(statusView, 0, 1, false).
+		AddItem(bottomFlex, 0, 1, false)
 
 	app.SetRoot(flex, true)
 
-	switchTab := func(idx int) {
-		if idx < 0 {
-			idx = len(tabs) - 1
-		} else if idx >= len(tabs) {
-			idx = 0
-		}
-		currentTab = idx
-		pages.SwitchToPage(tabs[idx].id)
-		updateNavBar(navBar, idx)
-	}
-
 	app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		switch event.Key() {
-		case tcell.KeyTAB:
-			switchTab(currentTab + 1)
-			return nil
-		case tcell.KeyBacktab:
-			switchTab(currentTab - 1)
-			return nil
 		case tcell.KeyESC:
 			cancel()
 			app.Stop()
@@ -138,21 +105,6 @@ func runTUI(ifName string) {
 	if err := app.Run(); err != nil {
 		log.Fatal(err)
 	}
-}
-
-func updateNavBar(navBar *tview.TextView, active int) {
-	var b strings.Builder
-	for i, tab := range tabs {
-		if i > 0 {
-			b.WriteString("  ")
-		}
-		if i == active {
-			fmt.Fprintf(&b, "[white:darkcyan] %s ", tab.title)
-		} else {
-			fmt.Fprintf(&b, "[gray:darkolivegreen] %s ", tab.title)
-		}
-	}
-	navBar.SetText(b.String())
 }
 
 func fetchAndUpdate(

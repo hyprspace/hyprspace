@@ -1,7 +1,9 @@
 package cli
 
 import (
+	"context"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -40,6 +42,9 @@ func TUIRun(r *cmd.Root, c *cmd.Sub) {
 
 // runTUI starts the TUI dashboard application. It blocks until the user quits.
 func runTUI(ifName string) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	app := tview.NewApplication()
 	pages := tview.NewPages()
 
@@ -100,9 +105,11 @@ func runTUI(ifName string) {
 			switchTab(currentTab - 1)
 			return nil
 		case tcell.KeyESC:
+			cancel()
 			app.Stop()
 			return nil
 		case tcell.KeyCtrlC:
+			cancel()
 			app.Stop()
 			return nil
 		}
@@ -118,13 +125,18 @@ func runTUI(ifName string) {
 		fetchAndUpdate(app, ifName, statusView, peersTable, routesTable)
 		ticker := time.NewTicker(pollInterval)
 		defer ticker.Stop()
-		for range ticker.C {
-			fetchAndUpdate(app, ifName, statusView, peersTable, routesTable)
+		for {
+			select {
+			case <-ticker.C:
+				fetchAndUpdate(app, ifName, statusView, peersTable, routesTable)
+			case <-ctx.Done():
+				return
+			}
 		}
 	}()
 
 	if err := app.Run(); err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 }
 
@@ -165,20 +177,16 @@ func fetchAndUpdate(
 
 	// Fetch routes in the same poll cycle.
 	routeReply, routeErr := rpc.TryRoute(ifName, rpc.RouteArgs{Action: rpc.Show})
-	if routeErr != nil {
-		app.QueueUpdateDraw(func() {
-			statusView.Clear()
-			fmt.Fprintf(statusView, "[red]⚠ RPC route call failed: %v[-]\n\n", routeErr)
-			routesTable.Clear()
-			routesTable.SetCell(0, 0, tview.NewTableCell("[gray]No data (RPC unavailable)[-]"))
-		})
-		return
-	}
 
 	app.QueueUpdateDraw(func() {
 		updateStatusView(statusView, status)
 		updatePeersTable(peersTable, status)
-		updateRoutesTable(routesTable, routeReply)
+		if routeErr != nil {
+			routesTable.Clear()
+			routesTable.SetCell(0, 0, tview.NewTableCell("[red]⚠ Route data unavailable[-]"))
+		} else {
+			updateRoutesTable(routesTable, routeReply)
+		}
 	})
 }
 

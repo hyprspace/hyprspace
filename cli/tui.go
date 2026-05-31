@@ -16,8 +16,6 @@ import (
 
 const pollInterval = 2 * time.Second
 
-
-
 // TUI starts the interactive TUI dashboard.
 var TUI = cmd.Sub{
 	Name:  "tui",
@@ -59,13 +57,19 @@ func runTUI(ifName string) {
 	routesTable.SetBorder(true)
 	routesTable.SetTitle(" Routes ")
 
+	quitHint := tview.NewTextView()
+	quitHint.SetDynamicColors(true)
+	quitHint.SetTextAlign(tview.AlignCenter)
+	quitHint.SetText("[gray]q / Esc / Ctrl-C to quit[-]")
+
 	bottomFlex := tview.NewFlex().SetDirection(tview.FlexColumn).
 		AddItem(peersTable, 0, 1, false).
 		AddItem(routesTable, 0, 1, false)
 
 	flex := tview.NewFlex().SetDirection(tview.FlexRow).
 		AddItem(statusView, 0, 1, false).
-		AddItem(bottomFlex, 0, 1, false)
+		AddItem(bottomFlex, 0, 1, false).
+		AddItem(quitHint, 1, 0, false)
 
 	app.SetRoot(flex, true)
 

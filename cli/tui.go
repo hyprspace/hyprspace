@@ -73,6 +73,23 @@ func runTUI(ifName string) {
 	routesTable.SetBorder(true)
 	routesTable.SetTitle(" Routes ")
 
+	peerDetail := tview.NewTextView()
+	peerDetail.SetDynamicColors(true)
+	peerDetail.SetWrap(true)
+
+	peersTable.SetSelectionChangedFunc(func(row, _ int) {
+		if row <= 0 {
+			peerDetail.Clear()
+			return
+		}
+		cell := peersTable.GetCell(row, 2)
+		if cell == nil {
+			peerDetail.Clear()
+			return
+		}
+		peerDetail.SetText("[gray]" + cell.Text + "[-]")
+	})
+
 	quitHint := tview.NewTextView()
 	quitHint.SetDynamicColors(true)
 	quitHint.SetTextAlign(tview.AlignCenter)
@@ -117,9 +134,12 @@ func runTUI(ifName string) {
 
 		switch mode {
 		case modeAll:
+			peersPane := tview.NewFlex().SetDirection(tview.FlexRow)
+			peersPane.AddItem(peersTable, 0, 1, false)
+			peersPane.AddItem(peerDetail, 2, 0, false)
 			topRow := tview.NewFlex().SetDirection(tview.FlexColumn)
 			topRow.AddItem(statusView, 0, 1, false)
-			topRow.AddItem(peersTable, 0, 1, false)
+			topRow.AddItem(peersPane, 0, 1, false)
 			flex.AddItem(topRow, 0, 1, false)
 			flex.AddItem(routesTable, 0, 1, false)
 			quitHint.SetText("[gray]Tab to cycle focus · q / Esc / Ctrl-C to quit[-]")
@@ -127,7 +147,10 @@ func runTUI(ifName string) {
 			flex.AddItem(statusView, 0, 1, false)
 			quitHint.SetText("[gray]status · Tab to cycle · q / Esc / Ctrl-C to quit[-]")
 		case modePeers:
-			flex.AddItem(peersTable, 0, 1, false)
+			peersPane := tview.NewFlex().SetDirection(tview.FlexRow)
+			peersPane.AddItem(peersTable, 0, 1, false)
+			peersPane.AddItem(peerDetail, 2, 0, false)
+			flex.AddItem(peersPane, 0, 1, false)
 			quitHint.SetText("[gray]peers · Tab to cycle · q / Esc / Ctrl-C to quit[-]")
 		case modeRoutes:
 			flex.AddItem(routesTable, 0, 1, false)

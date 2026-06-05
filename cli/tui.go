@@ -61,34 +61,19 @@ func runTUI(ifName string) {
 	statusView.SetBorder(true)
 	statusView.SetTitle(" Status ")
 
-	peersTable := tview.NewTable()
-	peersTable.SetBorders(false)
-	peersTable.SetSelectable(true, false)
-	peersTable.SetBorder(true)
-	peersTable.SetTitle(" Peers ")
+	peersView := tview.NewTextView()
+	peersView.SetDynamicColors(true)
+	peersView.SetScrollable(true)
+	peersView.SetWrap(true)
+	peersView.SetWordWrap(false)
+	peersView.SetBorder(true)
+	peersView.SetTitle(" Peers ")
 
 	routesTable := tview.NewTable()
 	routesTable.SetBorders(false)
 	routesTable.SetSelectable(true, false)
 	routesTable.SetBorder(true)
 	routesTable.SetTitle(" Routes ")
-
-	peerDetail := tview.NewTextView()
-	peerDetail.SetDynamicColors(true)
-	peerDetail.SetWrap(true)
-
-	peersTable.SetSelectionChangedFunc(func(row, _ int) {
-		if row <= 0 {
-			peerDetail.Clear()
-			return
-		}
-		cell := peersTable.GetCell(row, 2)
-		if cell == nil {
-			peerDetail.Clear()
-			return
-		}
-		peerDetail.SetText("[gray]" + cell.Text + "[-]")
-	})
 
 	quitHint := tview.NewTextView()
 	quitHint.SetDynamicColors(true)
@@ -111,18 +96,18 @@ func runTUI(ifName string) {
 
 	// focusedInAll tracks which pane has keyboard focus in modeAll.
 	focusedInAll := 0
-	allPanes := []tview.Primitive{statusView, peersTable, routesTable}
+	allPanes := []tview.Primitive{statusView, peersView, routesTable}
 
 	var updateAllFocus func()
 	updateAllFocus = func() {
 		statusView.SetBorderColor(tcell.ColorDefault)
-		peersTable.SetBorderColor(tcell.ColorDefault)
+		peersView.SetBorderColor(tcell.ColorDefault)
 		routesTable.SetBorderColor(tcell.ColorDefault)
 		switch focusedInAll {
 		case 0:
 			statusView.SetBorderColor(tcell.ColorYellow)
 		case 1:
-			peersTable.SetBorderColor(tcell.ColorYellow)
+			peersView.SetBorderColor(tcell.ColorYellow)
 		case 2:
 			routesTable.SetBorderColor(tcell.ColorYellow)
 		}
@@ -134,12 +119,9 @@ func runTUI(ifName string) {
 
 		switch mode {
 		case modeAll:
-			peersPane := tview.NewFlex().SetDirection(tview.FlexRow)
-			peersPane.AddItem(peersTable, 0, 1, false)
-			peersPane.AddItem(peerDetail, 2, 0, false)
 			topRow := tview.NewFlex().SetDirection(tview.FlexColumn)
 			topRow.AddItem(statusView, 0, 1, false)
-			topRow.AddItem(peersPane, 0, 1, false)
+			topRow.AddItem(peersView, 0, 1, false)
 			flex.AddItem(topRow, 0, 1, false)
 			flex.AddItem(routesTable, 0, 1, false)
 			quitHint.SetText("[gray]Tab to cycle focus · q / Esc / Ctrl-C to quit[-]")
@@ -147,10 +129,7 @@ func runTUI(ifName string) {
 			flex.AddItem(statusView, 0, 1, false)
 			quitHint.SetText("[gray]status · Tab to cycle · q / Esc / Ctrl-C to quit[-]")
 		case modePeers:
-			peersPane := tview.NewFlex().SetDirection(tview.FlexRow)
-			peersPane.AddItem(peersTable, 0, 1, false)
-			peersPane.AddItem(peerDetail, 2, 0, false)
-			flex.AddItem(peersPane, 0, 1, false)
+			flex.AddItem(peersView, 0, 1, false)
 			quitHint.SetText("[gray]peers · Tab to cycle · q / Esc / Ctrl-C to quit[-]")
 		case modeRoutes:
 			flex.AddItem(routesTable, 0, 1, false)
@@ -200,13 +179,13 @@ func runTUI(ifName string) {
 
 	// Poll goroutine — immediately fetches, then polls every 2s.
 	go func() {
-		fetchAndUpdate(app, ifName, statusView, peersTable, routesTable)
+		fetchAndUpdate(app, ifName, statusView, peersView, routesTable)
 		ticker := time.NewTicker(pollInterval)
 		defer ticker.Stop()
 		for {
 			select {
 			case <-ticker.C:
-				fetchAndUpdate(app, ifName, statusView, peersTable, routesTable)
+				fetchAndUpdate(app, ifName, statusView, peersView, routesTable)
 			case <-ctx.Done():
 				return
 			}
@@ -222,7 +201,7 @@ func fetchAndUpdate(
 	app *tview.Application,
 	ifName string,
 	statusView *tview.TextView,
-	peersTable *tview.Table,
+	peersView *tview.TextView,
 	routesTable *tview.Table,
 ) {
 	status, err := rpc.TryStatus(ifName)
@@ -230,8 +209,8 @@ func fetchAndUpdate(
 		app.QueueUpdateDraw(func() {
 			statusView.Clear()
 			fmt.Fprintf(statusView, "[red]⚠ RPC connection failed: %v[-]\n\n", err)
-			peersTable.Clear()
-			peersTable.SetCell(0, 0, tview.NewTableCell("[gray]No data (RPC unavailable)[-]"))
+			peersView.Clear()
+			fmt.Fprintf(peersView, "[gray]No data (RPC unavailable)[-]")
 			routesTable.Clear()
 			routesTable.SetCell(0, 0, tview.NewTableCell("[gray]No data (RPC unavailable)[-]"))
 		})
@@ -243,7 +222,7 @@ func fetchAndUpdate(
 
 	app.QueueUpdateDraw(func() {
 		updateStatusView(statusView, status)
-		updatePeersTable(peersTable, status)
+		updatePeersView(peersView, status)
 		if routeErr != nil {
 			routesTable.Clear()
 			routesTable.SetCell(0, 0, tview.NewTableCell("[red]⚠ Route data unavailable[-]"))
@@ -271,24 +250,16 @@ func updateStatusView(v *tview.TextView, s rpc.StatusReply) {
 	}
 }
 
-func updatePeersTable(t *tview.Table, s rpc.StatusReply) {
-	t.Clear()
+func updatePeersView(v *tview.TextView, s rpc.StatusReply) {
+	v.Clear()
 	if len(s.NetPeerAddrsCurrent) == 0 {
-		t.SetCell(0, 0, tview.NewTableCell("[gray]No peers connected.[-]"))
+		fmt.Fprintf(v, "[gray]No peers connected.[-]")
 		return
 	}
-
-	// Header row.
-	t.SetCell(0, 0, tview.NewTableCell("[::b]Name").SetSelectable(false))
-	t.SetCell(0, 1, tview.NewTableCell("[::b]Latency").SetSelectable(false))
-	t.SetCell(0, 2, tview.NewTableCell("[::b]Multiaddr").SetSelectable(false))
-
-	for i, entry := range s.NetPeerAddrsCurrent {
-		row := i + 1
+	fmt.Fprintf(v, "[::b]%-20s %-12s %s[-]\n", "Name", "Latency", "Multiaddr")
+	for _, entry := range s.NetPeerAddrsCurrent {
 		name, latency, addr := parsePeerEntry(entry)
-		t.SetCell(row, 0, tview.NewTableCell(name).SetExpansion(0))
-		t.SetCell(row, 1, tview.NewTableCell(latency).SetExpansion(0))
-		t.SetCell(row, 2, tview.NewTableCell(addr).SetExpansion(1))
+		fmt.Fprintf(v, "%-20s %-12s [gray]%s[-]\n", name, latency, addr)
 	}
 }
 

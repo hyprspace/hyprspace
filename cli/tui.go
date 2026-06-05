@@ -63,13 +63,13 @@ func runTUI(ifName string) {
 
 	peersTable := tview.NewTable()
 	peersTable.SetBorders(false)
-	peersTable.SetSelectable(false, false)
+	peersTable.SetSelectable(true, false)
 	peersTable.SetBorder(true)
 	peersTable.SetTitle(" Peers ")
 
 	routesTable := tview.NewTable()
 	routesTable.SetBorders(false)
-	routesTable.SetSelectable(false, false)
+	routesTable.SetSelectable(true, false)
 	routesTable.SetBorder(true)
 	routesTable.SetTitle(" Routes ")
 
@@ -92,15 +92,37 @@ func runTUI(ifName string) {
 
 	mode := defaultModes[0]
 
+	// focusedInAll tracks which pane has keyboard focus in modeAll.
+	focusedInAll := 0
+	allPanes := []tview.Primitive{statusView, peersTable, routesTable}
+
+	var updateAllFocus func()
+	updateAllFocus = func() {
+		statusView.SetBorderColor(tcell.ColorDefault)
+		peersTable.SetBorderColor(tcell.ColorDefault)
+		routesTable.SetBorderColor(tcell.ColorDefault)
+		switch focusedInAll {
+		case 0:
+			statusView.SetBorderColor(tcell.ColorYellow)
+		case 1:
+			peersTable.SetBorderColor(tcell.ColorYellow)
+		case 2:
+			routesTable.SetBorderColor(tcell.ColorYellow)
+		}
+		app.SetFocus(allPanes[focusedInAll])
+	}
+
 	rebuildLayout := func() {
 		flex := tview.NewFlex().SetDirection(tview.FlexRow)
 
 		switch mode {
 		case modeAll:
-			flex.AddItem(statusView, 7, 0, false)
-			flex.AddItem(peersTable, 0, 1, false)
+			topRow := tview.NewFlex().SetDirection(tview.FlexColumn)
+			topRow.AddItem(statusView, 0, 1, false)
+			topRow.AddItem(peersTable, 0, 1, false)
+			flex.AddItem(topRow, 0, 1, false)
 			flex.AddItem(routesTable, 0, 1, false)
-			quitHint.SetText("[gray]q / Esc / Ctrl-C to quit[-]")
+			quitHint.SetText("[gray]Tab to cycle focus · q / Esc / Ctrl-C to quit[-]")
 		case modeStatus:
 			flex.AddItem(statusView, 0, 1, false)
 			quitHint.SetText("[gray]status · Tab to cycle · q / Esc / Ctrl-C to quit[-]")
@@ -114,6 +136,9 @@ func runTUI(ifName string) {
 
 		flex.AddItem(quitHint, 1, 0, false)
 		app.SetRoot(flex, true)
+		if mode == modeAll {
+			updateAllFocus()
+		}
 	}
 
 	rebuildLayout()
@@ -129,6 +154,9 @@ func runTUI(ifName string) {
 					}
 				}
 				rebuildLayout()
+			} else {
+				focusedInAll = (focusedInAll + 1) % len(allPanes)
+				updateAllFocus()
 			}
 			return nil
 		case tcell.KeyESC:

@@ -167,9 +167,11 @@ func (node *Node) Run() error {
 	go p2p.Discover(node.ctx, node.wg, node.p2p, node.dht, node.cfg.Peers)
 
 	// Setup mDNS Discovery for LAN peers
-	err = p2p.SetupMDNS(node.p2p, node.cfg.Peers)
-	if err != nil {
-		logger.With(err).Warn("Failed to start mDNS discovery")
+	if !node.cfg.FilterPrivateAddresses {
+		err = p2p.SetupMDNS(node.p2p, node.cfg.Peers)
+		if err != nil {
+			logger.With(err).Warn("Failed to start mDNS discovery")
+		}
 	}
 
 	// Configure path for lock

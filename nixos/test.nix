@@ -12,8 +12,14 @@ let
     id = "12D3KooWNfMAtF1ZWb2j9MYpFz1ZmRzUAyq1CPYAwGttomNmqY46";
   };
 
+  dummyTunPrefix = "10.99.0";
+
   mkPeerConfig =
-    { privateKeyFile, peers }:
+    {
+      privateKeyFile,
+      peers,
+      dummyTunAddr,
+    }:
     {
       imports = [ self.nixosModules.default ];
       networking.firewall.enable = false;
@@ -23,6 +29,18 @@ let
         inherit privateKeyFile;
         settings.peers = peers;
       };
+      systemd.services.dummytun = {
+        description = "Dummy tunnel interface for anti-loop test";
+        before = [ "hyprspace.service" ];
+        wantedBy = [ "multi-user.target" ];
+        serviceConfig.Type = "oneshot";
+        serviceConfig.RemainAfterExit = true;
+        script = ''
+          ${pkgs.iproute2}/bin/ip tuntap add dev dummytun mode tun
+          ${pkgs.iproute2}/bin/ip addr add ${dummyTunAddr}/24 dev dummytun
+          ${pkgs.iproute2}/bin/ip link set dummytun up
+        '';
+      };
     };
 in
 pkgs.testers.nixosTest {
@@ -31,6 +49,7 @@ pkgs.testers.nixosTest {
   nodes = {
     peer1 = mkPeerConfig {
       privateKeyFile = pkgs.writeText "hs-key-peer1" peer1.privateKey;
+      dummyTunAddr = "${dummyTunPrefix}.1";
       peers = [
         {
           id = peer2.id;
@@ -40,6 +59,7 @@ pkgs.testers.nixosTest {
     };
     peer2 = mkPeerConfig {
       privateKeyFile = pkgs.writeText "hs-key-peer2" peer2.privateKey;
+      dummyTunAddr = "${dummyTunPrefix}.2";
       peers = [
         {
           id = peer1.id;
@@ -62,5 +82,11 @@ pkgs.testers.nixosTest {
 
     peer1.wait_until_succeeds("ping -c1 -W3 peer2.hyprspace", timeout=60)
     peer2.wait_until_succeeds("ping -c1 -W3 peer1.hyprspace", timeout=60)
+
+    for i, node in enumerate([peer1, peer2], start=1):
+        dummyTunAddr = f"${dummyTunPrefix}.{i}"
+        status = node.succeed("hyprspace status")
+        print(status)
+        assert dummyTunAddr not in status
   '';
 }

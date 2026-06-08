@@ -20,7 +20,7 @@ func NewFilterGater(networks ...net.IPNet) connmgr.ConnectionGater {
 		filters.AddFilter(network, multiaddr.ActionDeny)
 	}
 	return FilterGater{
-		Filters: multiaddr.NewFilters(),
+		Filters: filters,
 	}
 }
 

@@ -53,6 +53,7 @@ func runTUI(ifName string) {
 	defer cancel()
 
 	app := tview.NewApplication()
+	tview.Styles.PrimitiveBackgroundColor = tcell.ColorDefault
 
 	statusView := tview.NewTextView()
 	statusView.SetDynamicColors(true)

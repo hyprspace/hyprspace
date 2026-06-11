@@ -4,33 +4,17 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
 	"strings"
 	"time"
 
 	"github.com/DataDrake/cli-ng/v2/cmd"
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
-	"golang.org/x/term"
 
 	"github.com/hyprspace/hyprspace/rpc"
 )
 
 const pollInterval = 2 * time.Second
-
-type viewMode int
-
-const (
-	modeAll viewMode = iota
-	modeStatus
-	modePeers
-	modeRoutes
-)
-
-const (
-	smallMinHeight = 20
-	smallMinWidth  = 100
-)
 
 // TUI starts the interactive TUI dashboard.
 var TUI = cmd.Sub{
@@ -72,95 +56,39 @@ func runTUI(ifName string) {
 
 	routesTable := tview.NewTable()
 	routesTable.SetBorders(false)
-	routesTable.SetSelectable(true, false)
+	routesTable.SetSelectable(false, false)
 	routesTable.SetBorder(true)
 	routesTable.SetTitle(" Routes ")
 
 	quitHint := tview.NewTextView()
 	quitHint.SetDynamicColors(true)
 	quitHint.SetTextAlign(tview.AlignCenter)
+	quitHint.SetText("[gray]Tab to rotate panes · ↑↓ to scroll bottom · q / Esc / Ctrl-C to quit[-]")
 
-	w, h, err := term.GetSize(int(os.Stdout.Fd()))
-	if err != nil {
-		w, h = 100, 24
-	}
-	isSmall := h < smallMinHeight || w < smallMinWidth
+	// panes holds the three views assigned to [top-left, top-right, bottom].
+	// Tab rotates them clockwise: top-left → top-right → bottom → top-left.
+	panes := []tview.Primitive{statusView, peersView, routesTable}
 
-	var defaultModes []viewMode
-	if isSmall {
-		defaultModes = []viewMode{modeStatus, modePeers, modeRoutes}
-	} else {
-		defaultModes = []viewMode{modeAll, modePeers, modeRoutes}
-	}
-
-	mode := defaultModes[0]
-
-	// focusedInAll tracks which pane has keyboard focus in modeAll.
-	focusedInAll := 0
-	allPanes := []tview.Primitive{statusView, peersView, routesTable}
-
-	var updateAllFocus func()
-	updateAllFocus = func() {
-		statusView.SetBorderColor(tcell.ColorDefault)
-		peersView.SetBorderColor(tcell.ColorDefault)
-		routesTable.SetBorderColor(tcell.ColorDefault)
-		switch focusedInAll {
-		case 0:
-			statusView.SetBorderColor(tcell.ColorYellow)
-		case 1:
-			peersView.SetBorderColor(tcell.ColorYellow)
-		case 2:
-			routesTable.SetBorderColor(tcell.ColorYellow)
-		}
-		app.SetFocus(allPanes[focusedInAll])
-	}
-
-	rebuildLayout := func() {
+	buildLayout := func() {
+		topRow := tview.NewFlex().SetDirection(tview.FlexColumn)
+		topRow.AddItem(panes[0], 0, 1, false)
+		topRow.AddItem(panes[1], 0, 1, false)
 		flex := tview.NewFlex().SetDirection(tview.FlexRow)
-
-		switch mode {
-		case modeAll:
-			topRow := tview.NewFlex().SetDirection(tview.FlexColumn)
-			topRow.AddItem(statusView, 0, 1, false)
-			topRow.AddItem(peersView, 0, 1, false)
-			flex.AddItem(topRow, 0, 1, false)
-			flex.AddItem(routesTable, 0, 1, false)
-			quitHint.SetText("[gray]Tab to cycle focus · q / Esc / Ctrl-C to quit[-]")
-		case modeStatus:
-			flex.AddItem(statusView, 0, 1, false)
-			quitHint.SetText("[gray]status · Tab to cycle · q / Esc / Ctrl-C to quit[-]")
-		case modePeers:
-			flex.AddItem(peersView, 0, 1, false)
-			quitHint.SetText("[gray]peers · Tab to cycle · q / Esc / Ctrl-C to quit[-]")
-		case modeRoutes:
-			flex.AddItem(routesTable, 0, 1, false)
-			quitHint.SetText("[gray]routes · Tab to cycle · q / Esc / Ctrl-C to quit[-]")
-		}
-
+		flex.AddItem(topRow, 0, 1, false)
+		flex.AddItem(panes[2], 0, 1, false)
 		flex.AddItem(quitHint, 1, 0, false)
 		app.SetRoot(flex, true)
-		if mode == modeAll {
-			updateAllFocus()
-		}
+		app.SetFocus(panes[2])
 	}
 
-	rebuildLayout()
+	buildLayout()
 
 	app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		switch event.Key() {
 		case tcell.KeyTAB:
-			if isSmall {
-				for i, m := range defaultModes {
-					if m == mode {
-						mode = defaultModes[(i+1)%len(defaultModes)]
-						break
-					}
-				}
-				rebuildLayout()
-			} else {
-				focusedInAll = (focusedInAll + 1) % len(allPanes)
-				updateAllFocus()
-			}
+			// Clockwise: each view advances one slot (top-left→top-right→bottom→top-left).
+			panes[0], panes[1], panes[2] = panes[2], panes[0], panes[1]
+			buildLayout()
 			return nil
 		case tcell.KeyESC:
 			cancel()

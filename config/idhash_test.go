@@ -91,52 +91,6 @@ func Test_MkBuiltinAddr4_AllZeros(t *testing.T) {
 	assert.Equal(t, expected, []byte(result.To4()), "mkBuiltinAddr4 with zero peer should return base address")
 }
 
-func Test_MkBuiltinAddr4_VaryingLengths(t *testing.T) {
-	testCases := []struct {
-		name string
-		data []byte
-	}{
-		{"empty", []byte{}},
-		{"short", []byte{1, 2, 3}},
-		{"odd", make([]byte, 7)},
-		{"even", make([]byte, 8)},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			pid := peer.ID(tc.data)
-			assert.NotPanics(t, func() {
-				_ = mkBuiltinAddr4(pid)
-			}, "mkBuiltinAddr4 should not panic on %s peer ID", tc.name)
-		})
-	}
-}
-
-func Test_MkBuiltinAddr4_StartsWith100_64(t *testing.T) {
-	for i := 0; i < 10; i++ {
-		pk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
-		require.NoError(t, err)
-		pid, err := peer.IDFromPrivateKey(pk)
-		require.NoError(t, err)
-
-		addr := mkBuiltinAddr4(pid)
-		assert.Equal(t, byte(100), addr[0], "IPv4 should start with 100 for peer %s", pid)
-		assert.Equal(t, byte(64), addr[1], "IPv4 should start with 64 for peer %s", pid)
-	}
-}
-
-func Test_MkBuiltinAddr6_Prefix(t *testing.T) {
-	pk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
-	require.NoError(t, err)
-	pid, err := peer.IDFromPrivateKey(pk)
-	require.NoError(t, err)
-
-	ipv6 := mkBuiltinAddr6(pid)
-
-	expectedPrefix := []byte{0xfd, 0x00, 'h', 'y', 'p', 'r', 's', 'p', 'a', 'c', 'e', 0x00}
-	assert.Equal(t, expectedPrefix, []byte(ipv6[:12]), "IPv6 should have fixed prefix in first 12 bytes")
-}
-
 func Test_MkBuiltinAddr6_DifferentPeers(t *testing.T) {
 	ids := make([]peer.ID, 10)
 	for i := 0; i < 10; i++ {

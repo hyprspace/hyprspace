@@ -317,6 +317,12 @@ func (node *Node) streamHandler(stream network.Stream) {
 		stream.Reset()
 		return
 	}
+
+	node.activeStreams[stream.Conn().RemotePeer()] = SharedStream{
+		Stream: &stream,
+		Lock:   &sync.Mutex{},
+	}
+
 	var packet = make([]byte, 1420)
 	var packetSize = make([]byte, 2)
 	for {

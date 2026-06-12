@@ -8,8 +8,6 @@ import (
 
 	"github.com/DataDrake/cli-ng/v2/cmd"
 	"github.com/hyprspace/hyprspace/schema"
-	"github.com/libp2p/go-libp2p/core/crypto"
-	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multibase"
 )
 
@@ -39,10 +37,7 @@ func InitRun(r *cmd.Root, c *cmd.Sub) {
 		configPath = "/etc/hyprspace/" + ifName + ".json"
 	}
 
-	privKey, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
-	checkErr(err)
-
-	keyBytes, err := crypto.MarshalPrivateKey(privKey)
+	keyBytes, peerId, err := GenerateKeyPair()
 	checkErr(err)
 
 	// Setup an initial default config.
@@ -72,21 +67,19 @@ func InitRun(r *cmd.Root, c *cmd.Sub) {
 	checkErr(err)
 
 	fmt.Printf("Initialized new config at %s\n", configPath)
-	peerId, err := peer.IDFromPrivateKey(privKey)
-	if err == nil {
-		fmt.Println("Add this entry to your other peers:")
-		fmt.Println("{")
-		name := c.Flags.(*InitFlags).Name
-		if name == "" {
-			hostname, err := os.Hostname()
-			if err == nil {
-				name = hostname
-			}
+
+	fmt.Println("Add this entry to your other peers:")
+	fmt.Println("{")
+	name := c.Flags.(*InitFlags).Name
+	if name == "" {
+		hostname, err := os.Hostname()
+		if err == nil {
+			name = hostname
 		}
-		if name != "" {
-			fmt.Printf("  \"name\": \"%s\",\n", name)
-		}
-		fmt.Printf("  \"id\": \"%s\"\n", peerId)
-		fmt.Println("}")
 	}
+	if name != "" {
+		fmt.Printf("  \"name\": \"%s\",\n", name)
+	}
+	fmt.Printf("  \"id\": \"%s\"\n", peerId)
+	fmt.Println("}")
 }

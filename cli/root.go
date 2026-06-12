@@ -30,6 +30,7 @@ func init() {
 
 	cmd.Register(&cmd.Help)
 	cmd.Register(&Init)
+	cmd.Register(&Keygen)
 	cmd.Register(&Up)
 	cmd.Register(&Status)
 	cmd.Register(&Peers)

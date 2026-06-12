@@ -22,6 +22,7 @@ type Config struct {
 	Path                   string                `json:"-"`
 	Interface              string                `json:"-"`
 	ListenAddresses        []multiaddr.Multiaddr `json:"-"`
+	BootstrapPeers         []multiaddr.Multiaddr `json:"-"`
 	Peers                  []Peer                `json:"peers"`
 	PeerLookup             PeerLookup            `json:"-"`
 	PrivateKey             crypto.PrivKey        `json:"-"`
@@ -194,6 +195,14 @@ func Read(path string) (*Config, error) {
 	}
 
 	result.FilterPrivateAddresses = input.FilterPrivateAddresses
+
+	for _, addrString := range input.BootstrapPeers {
+		addr, err := multiaddr.NewMultiaddr(addrString)
+		if err != nil {
+			return nil, err
+		}
+		result.BootstrapPeers = append(result.BootstrapPeers, addr)
+	}
 
 	// Overwrite path of config to input.
 	result.Path = path

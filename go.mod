@@ -47,7 +47,8 @@ require (
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.uber.org/mock v0.5.2 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
-	golang.org/x/telemetry v0.0.0-20260311193753-579e4da9a98c // indirect
+	golang.org/x/mobile v0.0.0-20260611195102-4dd8f1dbf5d2 // indirect
+	golang.org/x/telemetry v0.0.0-20260610154732-fb80ec83bdd9 // indirect
 	golang.org/x/time v0.12.0 // indirect
 	golang.zx2c4.com/wintun v0.0.0-20230126152724-0fa3db229ce2 // indirect
 )
@@ -121,15 +122,17 @@ require (
 	go.uber.org/fx v1.24.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.1
-	golang.org/x/crypto v0.49.0 // indirect
+	golang.org/x/crypto v0.53.0 // indirect
 	golang.org/x/exp v0.0.0-20260312153236-7ab1446f8b90 // indirect
-	golang.org/x/mod v0.34.0 // indirect
-	golang.org/x/net v0.52.0
-	golang.org/x/sync v0.20.0 // indirect
-	golang.org/x/sys v0.42.0 // indirect
-	golang.org/x/text v0.35.0 // indirect
-	golang.org/x/tools v0.43.0 // indirect
+	golang.org/x/mod v0.37.0 // indirect
+	golang.org/x/net v0.56.0
+	golang.org/x/sync v0.21.0 // indirect
+	golang.org/x/sys v0.46.0 // indirect
+	golang.org/x/text v0.38.0 // indirect
+	golang.org/x/tools v0.46.0 // indirect
 	gonum.org/v1/gonum v0.17.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	lukechampine.com/blake3 v1.4.1 // indirect
 )
+
+tool golang.org/x/mobile/cmd/gobind

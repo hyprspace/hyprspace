@@ -444,14 +444,7 @@ func (node *Node) sendPacket(dst peer.ID, packet []byte, plen int) {
 		return
 	}
 
-	// If all succeeds when writing the packet to the stream
-	// we should reuse this stream by adding it active streams map.
-	if !node.insertActiveStream(dst, SharedStream{
-		Stream: &stream,
-		Lock:   new(sync.Mutex),
-	}) {
-		stream.Close()
-	}
+	go node.streamHandler(stream)
 }
 
 func (node *Node) eventLogger(ctx context.Context, host host.Host) error {

@@ -345,12 +345,16 @@ func (node *Node) streamHandler(stream network.Stream) {
 	}
 
 	var streamLock = new(sync.Mutex)
-	inserted := node.insertActiveStream(remotePeerID, SharedStream{
-		Stream: &stream,
-		Lock:   streamLock,
-	})
-	if inserted {
-		defer node.expireActiveStream(remotePeerID)
+
+	// Version 0 nodes don't read from this stream, so we can't reuse it.
+	if stream.Protocol() != p2p.ProtocolV0 {
+		inserted := node.insertActiveStream(remotePeerID, SharedStream{
+			Stream: &stream,
+			Lock:   streamLock,
+		})
+		if inserted {
+			defer node.expireActiveStream(remotePeerID)
+		}
 	}
 
 	var packet = make([]byte, 1420)
@@ -419,7 +423,7 @@ func (node *Node) sendPacket(dst peer.ID, packet []byte, plen int) {
 		}
 	}
 
-	stream, err := node.p2p.NewStream(node.ctx, dst, p2p.Protocol)
+	stream, err := node.p2p.NewStream(node.ctx, dst, p2p.Protocols...)
 	if err != nil {
 		logger.With(zap.String("destination", dst.String()), zap.Error(err)).Error("Failed to open stream")
 		go p2p.Rediscover()

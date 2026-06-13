@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/rpc"
 	"os"
+	"slices"
 	"sync"
 	"syscall"
 
@@ -82,7 +83,7 @@ func (hsr *HyprspaceRPC) Route(args *RouteArgs, reply *RouteReply) error {
 			ConnLoop:
 				for _, c := range hsr.host.Network().ConnsToPeer(rte.Target.ID) {
 					for _, s := range c.GetStreams() {
-						if s.Protocol() == p2p.Protocol {
+						if slices.Contains(p2p.Protocols, s.Protocol()) {
 							if _, err := c.RemoteMultiaddr().ValueForProtocol(multiaddr.P_CIRCUIT); err == nil {
 								relay = true
 								if ra, err := c.RemoteMultiaddr().ValueForProtocol(multiaddr.P_P2P); err == nil {

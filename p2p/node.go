@@ -21,6 +21,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/pnet"
+	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/libp2p/go-libp2p/p2p/discovery/backoff"
 	"github.com/libp2p/go-libp2p/p2p/host/autorelay"
@@ -48,8 +49,16 @@ func (c *httpRoutingWrapper) Bootstrap(ctx context.Context) error {
 	return nil
 }
 
-// Protocol is a descriptor for the Hyprspace P2P Protocol.
-const Protocol = "/hyprspace/0.0.1"
+// Version 0
+const ProtocolV0 = "/hyprspace/0.0.1"
+
+// Version 1: Bidirectional streams
+const ProtocolV1 = "/hyprspace/1"
+
+var Protocols = []protocol.ID{
+	ProtocolV1,
+	ProtocolV0,
+}
 
 func getExtraPeers(addr ma.Multiaddr) (nodesList []string) {
 	nodesList = []string{}
@@ -281,7 +290,9 @@ func CreateNode(ctx context.Context, privateKey crypto.PrivKey, listenAddreses [
 	node = routedhost.Wrap(basicHost, pr)
 
 	// Setup Hyprspace Stream Handler
-	node.SetStreamHandler(Protocol, handler)
+	for _, proto := range Protocols {
+		node.SetStreamHandler(proto, handler)
+	}
 
 	if err != nil {
 		return node, nil, err

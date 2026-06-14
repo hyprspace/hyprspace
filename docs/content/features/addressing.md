@@ -12,7 +12,7 @@ This is a node's primary IP address in the virtual network. It is used as the so
 
 ### Service address
 
-These are addresses used by the [[service-network]]. Each service gets its own address. These addresses should never leave the machine, neither through Hyprspace nor through other networks. Traffic in the [[service-network]] is handled at a higher layer.
+These are addresses used by the [service network](service-network.html). Each service gets its own address. These addresses should never leave the machine, neither through Hyprspace nor through other networks. Traffic in the [service network](service-network.html) is handled at a higher layer.
 
 ## IPv4 ranges
 
@@ -26,7 +26,7 @@ For IPv6, `fd00:6879:7072:7370:/64` is used, based on [RFC 4193: Unique Local IP
 
 `fd00:6879:7072:7370:6163:6500::/96` is the range used for built-in IPv6 addresses. The last 32 bits are used for the node identifier. The hex value `0x6879_7072_7370_6163_65` is the ASCII string `hyprspace`.
 
-`fd00:6879:7072:7370:7376::/80` is used for the [[service-network]]. The first 32 bits of the host part represent the node identifier, which is identical to the node identifier of built-in addresses. The last 16 bits represent the service identifier.
+`fd00:6879:7072:7370:7376::/80` is used for the [service network](service-network.html). The first 32 bits of the host part represent the node identifier, which is identical to the node identifier of built-in addresses. The last 16 bits represent the service identifier.
 
 ## Known Issues
 

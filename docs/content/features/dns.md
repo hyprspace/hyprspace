@@ -18,7 +18,7 @@ A node can also be looked up by its PeerID. This may require converting the Peer
 
 ## Service lookup
 
-Services in the [[service-network]] can be looked up in DNS by simply using the service name as a subdomain to the node, e.g. `myservice.mynode.hyprspace.`.
+Services in the [service network](service-network.html) can be looked up in DNS by simply using the service name as a subdomain to the node, e.g. `myservice.mynode.hyprspace.`.
 
 ## DNS resolver configuration
 

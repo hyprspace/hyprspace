@@ -6,8 +6,12 @@ import (
 	"net/rpc"
 )
 
+func socketPath(ifname string) string {
+	return fmt.Sprintf("/run/hyprspace-rpc.%s.sock", ifname)
+}
+
 func connect(ifname string) *rpc.Client {
-	client, err := rpc.Dial("unix", fmt.Sprintf("/run/hyprspace-rpc.%s.sock", ifname))
+	client, err := rpc.Dial("unix", socketPath(ifname))
 	if err != nil {
 		log.Fatal("[!] Failed to connect to RPC server: ", err)
 	}
@@ -39,4 +43,46 @@ func Route(ifname string, args RouteArgs) RouteReply {
 		log.Fatal("[!] RPC call failed: ", err)
 	}
 	return reply
+}
+
+func TryStatus(ifname string) (StatusReply, error) {
+	client, err := rpc.Dial("unix", socketPath(ifname))
+	if err != nil {
+		return StatusReply{}, err
+	}
+	defer client.Close()
+
+	var reply StatusReply
+	if err := client.Call("HyprspaceRPC.Status", new(Args), &reply); err != nil {
+		return StatusReply{}, err
+	}
+	return reply, nil
+}
+
+func TryPeers(ifname string) (PeersReply, error) {
+	client, err := rpc.Dial("unix", socketPath(ifname))
+	if err != nil {
+		return PeersReply{}, err
+	}
+	defer client.Close()
+
+	var reply PeersReply
+	if err := client.Call("HyprspaceRPC.Peers", new(Args), &reply); err != nil {
+		return PeersReply{}, err
+	}
+	return reply, nil
+}
+
+func TryRoute(ifname string, args RouteArgs) (RouteReply, error) {
+	client, err := rpc.Dial("unix", socketPath(ifname))
+	if err != nil {
+		return RouteReply{}, err
+	}
+	defer client.Close()
+
+	var reply RouteReply
+	if err := client.Call("HyprspaceRPC.Route", args, &reply); err != nil {
+		return RouteReply{}, err
+	}
+	return reply, nil
 }

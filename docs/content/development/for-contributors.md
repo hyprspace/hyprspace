@@ -18,5 +18,5 @@ $ nix flake check
 
 Hyprspace's codebase consists mainly of Go and Nix code. `go fmt` and nixfmt (RFC Style) are used respectively to format the code for those languages. Formatting is enforced via CI.
 
-Formatters are available in the [[Development|devShell]].
+Formatters are available in the [devShell](hacking.html).
 

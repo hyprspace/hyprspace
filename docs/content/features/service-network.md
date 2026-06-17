@@ -15,8 +15,12 @@ The config key `services` is used to configure the services a particular node sh
 ```json
 {
   "services": {
-    "example": "/tcp/8080",
-    "other": "/ip4/10.0.0.4/tcp/9092"
+    "example": {
+      "target": "/tcp/8080"
+    },
+    "other": {
+      "target": "/ip4/10.0.0.4/tcp/9092"
+    }
   }
 }
 ```

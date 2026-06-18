@@ -11,7 +11,7 @@ import (
 
 func Test_MkNetID_CollisionResistance(t *testing.T) {
 	ids := make([]peer.ID, 20)
-	for i := 0; i < 20; i++ {
+	for i := range 20 {
 		pk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
 		require.NoError(t, err)
 		ids[i], err = peer.IDFromPrivateKey(pk)
@@ -38,7 +38,7 @@ func Test_MkServiceID_NonCommutative(t *testing.T) {
 
 func Test_MkBuiltinAddr6_DifferentPeers(t *testing.T) {
 	ids := make([]peer.ID, 10)
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		pk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
 		require.NoError(t, err)
 		ids[i], err = peer.IDFromPrivateKey(pk)
@@ -70,7 +70,7 @@ func Test_MkServiceAddr6_DifferentServices(t *testing.T) {
 
 func Test_MkServiceAddr6_CollisionResistance(t *testing.T) {
 	ids := make([]peer.ID, 10)
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		pk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
 		require.NoError(t, err)
 		ids[i], err = peer.IDFromPrivateKey(pk)

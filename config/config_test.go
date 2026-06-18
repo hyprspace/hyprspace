@@ -12,7 +12,7 @@ import (
 
 func makeTestPeers(t *testing.T) []Peer {
 	peers := make([]Peer, 3)
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		pk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
 		require.NoError(t, err)
 		pid, err := peer.IDFromPrivateKey(pk)

@@ -379,9 +379,7 @@ func (node *Node) streamHandler(stream network.Stream) {
 				return
 			}
 		}
-		streamLock.Lock()
 		err = stream.SetWriteDeadline(time.Now().Add(25 * time.Second))
-		streamLock.Unlock()
 		if err != nil {
 			logger.With(err).Error("Failed to set write deadline")
 			stream.Close()

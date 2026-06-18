@@ -320,19 +320,18 @@ func (node *Node) getActiveStream(pid peer.ID) (SharedStream, bool) {
 
 func (node *Node) insertActiveStream(pid peer.ID, ss SharedStream) bool {
 	node.activeStreamsLock.Lock()
+	defer node.activeStreamsLock.Unlock()
 	if _, exists := node.activeStreams[pid]; exists {
-		node.activeStreamsLock.Unlock()
 		return false
 	}
 	node.activeStreams[pid] = ss
-	node.activeStreamsLock.Unlock()
 	return true
 }
 
 func (node *Node) expireActiveStream(pid peer.ID) {
 	node.activeStreamsLock.Lock()
+	defer node.activeStreamsLock.Unlock()
 	delete(node.activeStreams, pid)
-	node.activeStreamsLock.Unlock()
 }
 
 func (node *Node) streamHandler(stream network.Stream) {

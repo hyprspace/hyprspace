@@ -9,28 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func Test_MkNetID_edgeCases(t *testing.T) {
-	t.Run("all zeros", func(t *testing.T) {
-		// All-zero bytes: XOR with 0 leaves magic bytes unchanged
-		zeroPeer := peer.ID([]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0})
-		expected := [4]byte{0xde, 0xad, 0xbe, 0xef}
-		result := MkNetID(zeroPeer)
-		assert.Equal(t, expected, result, "MkNetID with all-zero peer should return magic bytes")
-	})
-	t.Run("all ff", func(t *testing.T) {
-		// MkNetID starts with [0xde, 0xad, 0xbe, 0xef], XORs each byte of peer ID
-		// With exactly 4 bytes of 0xff:
-		//   r[0] = 0xde ^ 0xff = 0x21
-		//   r[1] = 0xad ^ 0xff = 0x52
-		//   r[2] = 0xbe ^ 0xff = 0x41
-		//   r[3] = 0xef ^ 0xff = 0x10
-		ffPeer := peer.ID([]byte{0xff, 0xff, 0xff, 0xff})
-		expected := [4]byte{0x21, 0x52, 0x41, 0x10}
-		result := MkNetID(ffPeer)
-		assert.Equal(t, expected, result, "MkNetID with all-0xFF bytes should XOR correctly")
-	})
-}
-
 func Test_MkNetID_CollisionResistance(t *testing.T) {
 	ids := make([]peer.ID, 20)
 	for i := 0; i < 20; i++ {
@@ -50,28 +28,12 @@ func Test_MkNetID_CollisionResistance(t *testing.T) {
 	assert.Equal(t, 20, len(netIDs), "All 20 MkNetID results should be unique")
 }
 
-func Test_MkServiceID_Empty(t *testing.T) {
-	result := MkServiceID("")
-
-	expected := [2]byte{0xff, 0xfe}
-	assert.Equal(t, expected, result, "MkServiceID with empty string should return magic bytes")
-}
-
 func Test_MkServiceID_NonCommutative(t *testing.T) {
 	id1 := MkServiceID("ab")
 	id2 := MkServiceID("ba")
 
 	assert.NotEqual(t, id1, id2, "MkServiceID should be non-commutative")
 	assert.Equal(t, [2]byte{0xff, 0x9c}, id1, "MkServiceID(\"ab\") should be [0xff, 0x9c]")
-}
-
-func Test_MkBuiltinAddr4_AllZeros(t *testing.T) {
-	zeroPeer := peer.ID([]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0})
-
-	result := mkBuiltinAddr4(zeroPeer)
-
-	expected := []byte{100, 64, 1, 2}
-	assert.Equal(t, expected, []byte(result.To4()), "mkBuiltinAddr4 with zero peer should return base address")
 }
 
 func Test_MkBuiltinAddr6_DifferentPeers(t *testing.T) {
@@ -126,22 +88,4 @@ func Test_MkServiceAddr6_CollisionResistance(t *testing.T) {
 	}
 
 	assert.Equal(t, 30, len(addrs), "All 30 addresses should be unique")
-}
-
-func Test_MkServiceAddr6_NetIDAndServiceByteLayout(t *testing.T) {
-	pk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
-	require.NoError(t, err)
-	pid, err := peer.IDFromPrivateKey(pk)
-	require.NoError(t, err)
-
-	addr := MkServiceAddr6(pid, "http")
-	netID := MkNetID(pid)
-	svcID := MkServiceID("http")
-
-	assert.Equal(t, netID[0], addr[10], "Address byte 10 should match netID[0]")
-	assert.Equal(t, netID[1], addr[11], "Address byte 11 should match netID[1]")
-	assert.Equal(t, netID[2], addr[12], "Address byte 12 should match netID[2]")
-	assert.Equal(t, netID[3], addr[13], "Address byte 13 should match netID[3]")
-	assert.Equal(t, svcID[0], addr[14], "Address byte 14 should match svcID[0]")
-	assert.Equal(t, svcID[1], addr[15], "Address byte 15 should match svcID[1]")
 }

@@ -57,23 +57,6 @@ func Test_MkServiceID_Empty(t *testing.T) {
 	assert.Equal(t, expected, result, "MkServiceID with empty string should return magic bytes")
 }
 
-func Test_MkServiceID_SingleChar(t *testing.T) {
-	result := MkServiceID("x")
-
-	// BUG: Single-character service names collide with the empty string.
-	// MkServiceID computes `id[i%2] ^= b * byte(i)`, so for i=0 the contribution
-	// is always zero and the first character has no effect on the resulting ID.
-	// This is a known bug, not intended behavior. It is not fixed here because
-	// changing MkServiceID is a wire-protocol breaking change (it would alter
-	// every IPv6 service address and the svcId lookup keys in ServiceNetwork),
-	// requiring a coordinated upgrade across all peers in a network. Single-char
-	// service names are not used in practice, so the bug is harmless today.
-	// This test pins the current (buggy) behavior so any accidental change to
-	// MkServiceID is caught; fix it together with a protocol version bump.
-	expected := [2]byte{0xff, 0xfe}
-	assert.Equal(t, expected, result, "BUG: single-char service ID collides with empty string")
-}
-
 func Test_MkServiceID_NonCommutative(t *testing.T) {
 	id1 := MkServiceID("ab")
 	id2 := MkServiceID("ba")

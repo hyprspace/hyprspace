@@ -21,11 +21,14 @@ import (
 var logger = log.Logger("hyprspace/dns")
 
 func domainSuffix(config config.Config) string {
-	if config.Interface == "hyprspace" {
-		return "hyprspace."
-	} else {
-		return fmt.Sprintf("%s.hyprspace.", config.Interface)
+	domain := config.Domain
+	if domain == "" {
+		domain = "hyprspace"
 	}
+	if config.Interface == "hyprspace" {
+		return domain + "."
+	}
+	return fmt.Sprintf("%s.%s.", config.Interface, domain)
 }
 
 func withDomainSuffix(config config.Config, str string) string {

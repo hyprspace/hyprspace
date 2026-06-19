@@ -20,7 +20,9 @@ The config key `services` is used to configure the services a particular node sh
   }
 }
 ```
-This will make the services `example.mynode.hyprspace` and `other.mynode.hyrpspace` available. Upon connecting to the `example` service, the node establishes a connection to `/ip4/127.0.0.1/tcp/8080` and will relay all traffic between the service and the client.
+This will make the services `example.mynode.hyprspace` and `other.mynode.hyprspace` available. Upon connecting to the `example` service, the node establishes a connection to `/ip4/127.0.0.1/tcp/8080` and will relay all traffic between the service and the client.
+
+> **Note:** The `.hyprspace.` suffix follows the `domain` configuration option. If you change it (e.g. to `vpn.internal`), the hostnames will use that domain instead (e.g. `example.mynode.vpn.internal`).
 
 
 ## Implementation details

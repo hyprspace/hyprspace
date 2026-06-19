@@ -83,6 +83,13 @@ in
   options = {
     filterPrivateAddresses = mkEnableOption "filtering of private/link-local addresses from peer discovery. When enabled, the node will not attempt to connect to RFC1918, link-local, or loopback addresses advertised by other peers";
 
+    domain = mkOption {
+      type = types.str;
+      description = "Domain suffix used for DNS names within the Hyprspace network.";
+      default = "hyprspace";
+      example = "vpn.internal";
+    };
+
     listenAddresses = mkOption {
       type = types.listOf t.multiAddr;
       description = "List of addresses to listen on for libp2p traffic.";

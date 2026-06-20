@@ -25,14 +25,49 @@ import (
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/connmgr"
 	"github.com/libp2p/go-libp2p/core/control"
+	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	ma "github.com/multiformats/go-multiaddr"
+	"github.com/multiformats/go-multibase"
 	"go.uber.org/zap"
 )
 
 var logger = log.Logger("hyprspace/mobile")
+
+// Identity is this node's stable cryptographic identity, returned by
+// GenerateIdentity for first-launch config creation.
+type Identity struct {
+	// PrivateKey is the multibase (Base58BTC) encoded libp2p private key.
+	// Persist it verbatim in the config's "privateKey" field.
+	PrivateKey string
+	// PeerID is the libp2p peer ID derived from the key, for display.
+	PeerID string
+}
+
+// GenerateIdentity creates a fresh Ed25519 libp2p identity. Call it once on
+// first launch when no config file exists; persist PrivateKey in the config's
+// "privateKey" field. The peer ID and tunnel addresses are all derived from
+// this key (use GetVPNConfig for the addresses after the file is written).
+func GenerateIdentity() (*Identity, error) {
+	privKey, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
+	if err != nil {
+		return nil, err
+	}
+	keyBytes, err := crypto.MarshalPrivateKey(privKey)
+	if err != nil {
+		return nil, err
+	}
+	peerID, err := peer.IDFromPrivateKey(privKey)
+	if err != nil {
+		return nil, err
+	}
+	return &Identity{
+		PrivateKey: multibase.MustNewEncoder(multibase.Base58BTC).Encode(keyBytes),
+		PeerID:     peerID.String(),
+	}, nil
+}
 
 // VPNConfig contains the network parameters that Android's VpnService.Builder
 // needs before calling establish() to create the TUN device.

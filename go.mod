@@ -4,12 +4,14 @@ go 1.25.7
 
 require (
 	github.com/DataDrake/cli-ng/v2 v2.0.2
+	github.com/gdamore/tcell/v2 v2.8.1
 	github.com/iguanesolutions/go-systemd/v5 v5.1.1
 	github.com/libp2p/go-libp2p v0.48.0
 	github.com/libp2p/go-libp2p-kad-dht v0.39.0
 	github.com/multiformats/go-multiaddr v0.16.1
 	github.com/multiformats/go-multibase v0.2.0
 	github.com/prometheus/client_golang v1.23.2
+	github.com/rivo/tview v0.42.0
 	github.com/songgao/water v0.0.0-20200317203138-2b4b6d7c09d8
 	github.com/stretchr/testify v1.11.1
 	github.com/vishvananda/netlink v1.1.1-0.20211118161826-650dca95af54
@@ -24,9 +26,12 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dunglas/httpsfv v1.1.0 // indirect
 	github.com/filecoin-project/go-clock v0.1.0 // indirect
+	github.com/gdamore/encoding v1.0.1 // indirect
 	github.com/google/btree v1.1.2 // indirect
 	github.com/libp2p/go-libp2p-routing-helpers v0.7.5 // indirect
 	github.com/libp2p/go-yamux/v5 v5.0.1 // indirect
+	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
+	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/pion/datachannel v1.5.10 // indirect
 	github.com/pion/dtls/v3 v3.1.2 // indirect
@@ -46,11 +51,13 @@ require (
 	github.com/pion/turn/v4 v4.0.2 // indirect
 	github.com/pion/webrtc/v4 v4.1.2 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
+	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/wlynxg/anet v0.0.5 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.uber.org/mock v0.5.2 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
 	golang.org/x/telemetry v0.0.0-20260311193753-579e4da9a98c // indirect
+	golang.org/x/term v0.43.0 // indirect
 	golang.org/x/time v0.12.0 // indirect
 	golang.zx2c4.com/wintun v0.0.0-20230126152724-0fa3db229ce2 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
@@ -130,7 +137,7 @@ require (
 	golang.org/x/mod v0.34.0 // indirect
 	golang.org/x/net v0.52.0
 	golang.org/x/sync v0.20.0 // indirect
-	golang.org/x/sys v0.42.0 // indirect
+	golang.org/x/sys v0.44.0 // indirect
 	golang.org/x/text v0.35.0 // indirect
 	golang.org/x/tools v0.43.0 // indirect
 	gonum.org/v1/gonum v0.17.0 // indirect

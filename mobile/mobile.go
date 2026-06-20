@@ -94,6 +94,89 @@ type Node struct {
 	ctx           context.Context
 	cancel        context.CancelFunc
 	wg            sync.WaitGroup
+
+	events        Events
+	stateMu       sync.Mutex
+	lastState     string
+	lastConnected int
+}
+
+// Events receives node lifecycle and health notifications. It is implemented on
+// the Android side and passed to StartNode.
+//
+// Methods may be called from arbitrary goroutines (libp2p network
+// notifications, the TUN read loop, etc.), so the implementation must be
+// thread-safe and MUST NOT block — post to a Handler or update a thread-safe
+// holder such as a StateFlow. Do not call back into Go synchronously from these
+// callbacks.
+type Events interface {
+	// OnStateChange reports a lifecycle transition. state is one of:
+	//   "running"   – node started; no configured peer connected yet
+	//   "connected" – at least one configured peer is reachable
+	//   "stopped"   – clean shutdown
+	//   "error"     – fatal; detail holds the message; the node is down
+	OnStateChange(state string, detail string)
+
+	// OnPeerCountChange reports how many configured peers are currently
+	// connected, out of the total configured.
+	OnPeerCountChange(connected int, total int)
+}
+
+// emit reports a lifecycle state change, deduplicating repeated states so the
+// Android side is not spammed. The Events callback is invoked without holding
+// stateMu to avoid deadlocks if the implementation re-enters.
+func (n *Node) emit(state, detail string) {
+	if n.events == nil {
+		return
+	}
+	n.stateMu.Lock()
+	if state == n.lastState {
+		n.stateMu.Unlock()
+		return
+	}
+	n.lastState = state
+	n.stateMu.Unlock()
+	n.events.OnStateChange(state, detail)
+}
+
+// emitPeers reports a change in the number of connected configured peers,
+// deduplicating identical counts.
+func (n *Node) emitPeers(connected, total int) {
+	if n.events == nil {
+		return
+	}
+	n.stateMu.Lock()
+	if connected == n.lastConnected {
+		n.stateMu.Unlock()
+		return
+	}
+	n.lastConnected = connected
+	n.stateMu.Unlock()
+	n.events.OnPeerCountChange(connected, total)
+}
+
+// registerHealth subscribes to libp2p connection events and reports how many
+// configured peers are currently reachable, transitioning between the
+// "running" (no peers) and "connected" (>=1 peer) states.
+func (n *Node) registerHealth() {
+	update := func() {
+		connected := 0
+		for _, p := range n.cfg.Peers {
+			if n.host.Network().Connectedness(p.ID) == network.Connected {
+				connected++
+			}
+		}
+		n.emitPeers(connected, len(n.cfg.Peers))
+		if connected > 0 {
+			n.emit("connected", "")
+		} else {
+			n.emit("running", "")
+		}
+	}
+	n.host.Network().Notify(&network.NotifyBundle{
+		ConnectedF:    func(network.Network, network.Conn) { update() },
+		DisconnectedF: func(network.Network, network.Conn) { update() },
+	})
 }
 
 type sharedStream struct {
@@ -104,8 +187,11 @@ type sharedStream struct {
 // StartNode starts a Hyprspace node using a TUN file descriptor from Android's
 // VpnService. The fd must be obtained via ParcelFileDescriptor.detachFd() after
 // VpnService.Builder.establish(). configPath is the path to the hyprspace JSON
-// config file on the Android filesystem.
-func StartNode(fd int, configPath string) (*Node, error) {
+// config file on the Android filesystem. events receives lifecycle and health
+// notifications and may be nil.
+// For Android: Call `pfd.detachFd()` and pass that int; never close the `ParcelFileDescriptor`
+// yourself. (it would double-close)
+func StartNode(fd int, configPath string, events Events) (*Node, error) {
 	log.SetLogLevel("hyprspace", "info")
 	log.SetLogLevelRegex("^hyprspace/", "info")
 
@@ -128,6 +214,7 @@ func StartNode(fd int, configPath string) (*Node, error) {
 		activeStreams: make(map[peer.ID]*sharedStream),
 		ctx:           ctx,
 		cancel:        cancel,
+		events:        events,
 	}
 
 	// Use passthrough gater since Android VpnService handles routing protection
@@ -161,6 +248,9 @@ func StartNode(fd int, configPath string) (*Node, error) {
 
 	go n.readLoop()
 
+	n.registerHealth()
+	n.emit("running", "")
+
 	logger.Info("Mobile node started")
 	return n, nil
 }
@@ -172,6 +262,7 @@ func (n *Node) Stop() error {
 	err := n.host.Close()
 	n.tunFile.Close()
 	n.wg.Wait()
+	n.emit("stopped", "")
 	return err
 }
 
@@ -190,6 +281,11 @@ func (n *Node) readLoop() {
 		if err != nil {
 			if errors.Is(err, fs.ErrClosed) || errors.Is(err, os.ErrClosed) {
 				logger.Warn("TUN closed, stopping read loop")
+				// A close that did not originate from Stop() means the tunnel
+				// died on its own; surface it as a fatal error.
+				if n.ctx.Err() == nil {
+					n.emit("error", "tunnel closed unexpectedly")
+				}
 				return
 			}
 			if n.ctx.Err() != nil {

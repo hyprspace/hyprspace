@@ -4,12 +4,14 @@ go 1.25.7
 
 require (
 	github.com/DataDrake/cli-ng/v2 v2.0.2
+	github.com/gdamore/tcell/v2 v2.8.1
 	github.com/iguanesolutions/go-systemd/v5 v5.1.1
 	github.com/libp2p/go-libp2p v0.48.0
 	github.com/libp2p/go-libp2p-kad-dht v0.39.0
 	github.com/multiformats/go-multiaddr v0.16.1
 	github.com/multiformats/go-multibase v0.2.0
 	github.com/prometheus/client_golang v1.23.2
+	github.com/rivo/tview v0.42.0
 	github.com/songgao/water v0.0.0-20200317203138-2b4b6d7c09d8
 	github.com/stretchr/testify v1.11.1
 	github.com/vishvananda/netlink v1.1.1-0.20211118161826-650dca95af54
@@ -25,7 +27,6 @@ require (
 	github.com/dunglas/httpsfv v1.1.0 // indirect
 	github.com/filecoin-project/go-clock v0.1.0 // indirect
 	github.com/gdamore/encoding v1.0.1 // indirect
-	github.com/gdamore/tcell/v2 v2.8.1 // indirect
 	github.com/google/btree v1.1.2 // indirect
 	github.com/libp2p/go-libp2p-routing-helpers v0.7.5 // indirect
 	github.com/libp2p/go-yamux/v5 v5.0.1 // indirect
@@ -49,12 +50,8 @@ require (
 	github.com/pion/transport/v4 v4.0.1 // indirect
 	github.com/pion/turn/v4 v4.0.2 // indirect
 	github.com/pion/webrtc/v4 v4.1.2 // indirect
-<<<<<<< HEAD
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-=======
-	github.com/rivo/tview v0.42.0 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
->>>>>>> 24dd159 (cli: add hyprspace tui subcommand with interactive dashboard)
 	github.com/wlynxg/anet v0.0.5 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.uber.org/mock v0.5.2 // indirect

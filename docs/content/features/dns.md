@@ -4,7 +4,11 @@ Hyprspace runs a simple DNS server on the loopback interface for the purpose of 
 
 ## Domain
 
-All DNS records are placed under a specific domain, based on the name of the network interface that Hyprspace controls. If the interface name is `hyprspace`, then the top-level domain `hyprspace.` is used. Otherwise, the domain `${interfaceName}.hyprspace.` is used. The rest of this document will assume that the domain is `hyprspace.`.
+All DNS records are placed under a specific domain, based on the `domain` config key (which defaults to `hyprspace`). If the interface name is `hyprspace` and the default `domain` is used, then the domain `hyprspace.` is used. Otherwise, the domain `${interfaceName}.${domain}.` is used. The rest of this document will assume that the domain is `hyprspace.`.
+
+## `domain` option
+
+The `domain` option in the JSON config file or the NixOS module controls the domain used for the internal DNS zone. The default is `hyprspace`. This may be a simple label (e.g. `vpn`) or a multi-label domain (e.g. `vpn.internal`). For example, setting `"domain": "vpn.internal"` would make all DNS names end in `.vpn.internal.` instead of `.hyprspace.`.
 
 ## Node lookup
 

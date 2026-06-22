@@ -30,6 +30,7 @@ type Config struct {
 	BuiltinAddr6           net.IP                `json:"-"`
 	Services               map[string]Service    `json:"-"`
 	FilterPrivateAddresses bool                  `json:"-"`
+	Domain                 string                `json:"-"`
 }
 
 // Peer defines a peer in the configuration. We might add more to this later.
@@ -195,6 +196,11 @@ func Read(path string) (*Config, error) {
 	}
 
 	result.FilterPrivateAddresses = input.FilterPrivateAddresses
+
+	result.Domain = input.Domain
+	if result.Domain == "" {
+		result.Domain = "hyprspace"
+	}
 
 	for _, addrString := range input.BootstrapPeers {
 		addr, err := multiaddr.NewMultiaddr(addrString)

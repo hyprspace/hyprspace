@@ -11,11 +11,38 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/p2p/discovery/mdns"
 	"github.com/multiformats/go-multiaddr"
+	"go.uber.org/zap"
 )
 
 var discoverNow = make(chan bool)
 var logger = log.Logger("hyprspace/p2p")
+
+// mdnsNotifee handles peers discovered via mDNS.
+type mdnsNotifee struct {
+	h     host.Host
+	peers []config.Peer
+}
+
+func (n *mdnsNotifee) HandlePeerFound(pi peer.AddrInfo) {
+	// Only connect to peers that are in our VPN config.
+	if _, ok := config.FindPeer(n.peers, pi.ID); !ok {
+		return
+	}
+	logger.With(zap.String("peer", pi.ID.String()), zap.Int("addrs", len(pi.Addrs))).Info("Discovered peer via mDNS")
+	ctx, _ := context.WithDeadline(context.Background(), time.Now().Add(5*time.Second))
+	go n.h.Connect(ctx, pi)
+}
+
+// SetupMDNS starts the mDNS discovery service. Discovered peers that match
+// the VPN's peer list are added to the peerstore so the connection loop
+// can reach them without DHT bootstrap nodes.
+func SetupMDNS(h host.Host, peers []config.Peer) error {
+	notifee := &mdnsNotifee{h: h, peers: peers}
+	svc := mdns.NewMdnsService(h, "_p2p._udp", notifee)
+	return svc.Start()
+}
 
 // Discover starts up a DHT based discovery system finding and adding nodes with the same rendezvous string.
 func Discover(ctx context.Context, wg *sync.WaitGroup, h host.Host, dht *dht.IpfsDHT, peers []config.Peer) {

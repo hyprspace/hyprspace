@@ -11,6 +11,7 @@ require (
 	github.com/multiformats/go-multibase v0.2.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/songgao/water v0.0.0-20200317203138-2b4b6d7c09d8
+	github.com/stretchr/testify v1.11.1
 	github.com/vishvananda/netlink v1.1.1-0.20211118161826-650dca95af54
 	golang.zx2c4.com/wireguard v0.0.0-20231211153847-12269c276173
 	gvisor.dev/gvisor v0.0.0-20230927004350-cbd86285d259
@@ -20,11 +21,13 @@ require (
 	filippo.io/bigmod v0.1.1-0.20260103110540-f8a47775ebe5 // indirect
 	filippo.io/keygen v0.0.0-20260114151900-8e2790ea4c5b // indirect
 	github.com/Jorropo/jsync v1.0.1 // indirect
+	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dunglas/httpsfv v1.1.0 // indirect
 	github.com/filecoin-project/go-clock v0.1.0 // indirect
 	github.com/google/btree v1.1.2 // indirect
 	github.com/libp2p/go-libp2p-routing-helpers v0.7.5 // indirect
 	github.com/libp2p/go-yamux/v5 v5.0.1 // indirect
+	github.com/libp2p/zeroconf/v2 v2.2.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/pion/datachannel v1.5.10 // indirect
 	github.com/pion/dtls/v3 v3.1.2 // indirect
@@ -43,6 +46,7 @@ require (
 	github.com/pion/transport/v4 v4.0.1 // indirect
 	github.com/pion/turn/v4 v4.0.2 // indirect
 	github.com/pion/webrtc/v4 v4.1.2 // indirect
+	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/wlynxg/anet v0.0.5 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.uber.org/mock v0.5.2 // indirect
@@ -50,6 +54,7 @@ require (
 	golang.org/x/telemetry v0.0.0-20260311193753-579e4da9a98c // indirect
 	golang.org/x/time v0.12.0 // indirect
 	golang.zx2c4.com/wintun v0.0.0-20230126152724-0fa3db229ce2 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
 require (

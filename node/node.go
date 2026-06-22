@@ -40,17 +40,18 @@ type SharedStream struct {
 }
 
 type Node struct {
-	cfg           *config.Config
-	p2p           host.Host
-	dht           *dht.IpfsDHT
-	tunDev        *tun.TUN
-	activeStreams map[peer.ID]SharedStream
-	ctx           context.Context
-	cancel        func()
-	lockPath      string
-	configPath    string
-	interfaceName string
-	wg            *sync.WaitGroup
+	cfg               *config.Config
+	p2p               host.Host
+	dht               *dht.IpfsDHT
+	tunDev            *tun.TUN
+	activeStreams     map[peer.ID]SharedStream
+	activeStreamsLock sync.RWMutex
+	ctx               context.Context
+	cancel            func()
+	lockPath          string
+	configPath        string
+	interfaceName     string
+	wg                *sync.WaitGroup
 }
 
 func New(ctx context.Context, configPath string, ifName string) Node {
@@ -60,7 +61,6 @@ func New(ctx context.Context, configPath string, ifName string) Node {
 		cfg:           &config.Config{},
 		p2p:           nil,
 		tunDev:        &tun.TUN{},
-		activeStreams: map[peer.ID]SharedStream{},
 		ctx:           innerCtx,
 		cancel:        ctxCancel,
 		configPath:    configPath,
@@ -142,6 +142,7 @@ func (node *Node) Run() error {
 		node.ctx,
 		node.cfg.PrivateKey,
 		node.cfg.ListenAddresses,
+		node.cfg.BootstrapPeers,
 		node.streamHandler,
 		p2p.NewClosedCircuitRelayFilter(node.cfg.Peers),
 		gater,
@@ -162,8 +163,16 @@ func (node *Node) Run() error {
 
 	logger.Debug("Setting up Node discovery via DHT")
 
-	// Setup P2P Discovery
+	// Setup DHT Discovery
 	go p2p.Discover(node.ctx, node.wg, node.p2p, node.dht, node.cfg.Peers)
+
+	// Setup mDNS Discovery for LAN peers
+	if !node.cfg.FilterPrivateAddresses {
+		err = p2p.SetupMDNS(node.p2p, node.cfg.Peers)
+		if err != nil {
+			logger.With(err).Warn("Failed to start mDNS discovery")
+		}
+	}
 
 	// Configure path for lock
 	node.lockPath = filepath.Join(filepath.Dir(node.cfg.Path), node.cfg.Interface+".lock")
@@ -311,12 +320,51 @@ func (node *Node) Run() error {
 	return nil
 }
 
+func (node *Node) getActiveStream(pid peer.ID) (SharedStream, bool) {
+	node.activeStreamsLock.RLock()
+	defer node.activeStreamsLock.RUnlock()
+	s, ok := node.activeStreams[pid]
+	return s, ok
+}
+
+func (node *Node) insertActiveStream(pid peer.ID, ss SharedStream) bool {
+	node.activeStreamsLock.Lock()
+	defer node.activeStreamsLock.Unlock()
+	if _, exists := node.activeStreams[pid]; exists {
+		return false
+	}
+	node.activeStreams[pid] = ss
+	return true
+}
+
+func (node *Node) expireActiveStream(pid peer.ID) {
+	node.activeStreamsLock.Lock()
+	defer node.activeStreamsLock.Unlock()
+	delete(node.activeStreams, pid)
+}
+
 func (node *Node) streamHandler(stream network.Stream) {
+	remotePeerID := stream.Conn().RemotePeer()
+
 	// If the remote node ID isn't in the list of known nodes don't respond.
-	if _, ok := config.FindPeer(node.cfg.Peers, stream.Conn().RemotePeer()); !ok {
+	if _, ok := config.FindPeer(node.cfg.Peers, remotePeerID); !ok {
 		stream.Reset()
 		return
 	}
+
+	var streamLock = new(sync.Mutex)
+
+	// Version 0 nodes don't read from this stream, so we can't reuse it.
+	if stream.Protocol() != p2p.ProtocolV0 {
+		inserted := node.insertActiveStream(remotePeerID, SharedStream{
+			Stream: &stream,
+			Lock:   streamLock,
+		})
+		if inserted {
+			defer node.expireActiveStream(remotePeerID)
+		}
+	}
+
 	var packet = make([]byte, 1420)
 	var packetSize = make([]byte, 2)
 	for {
@@ -352,7 +400,7 @@ func (node *Node) streamHandler(stream network.Stream) {
 
 func (node *Node) sendPacket(dst peer.ID, packet []byte, plen int) {
 	// Check if we already have an open connection to the destination peer.
-	ms, ok := node.activeStreams[dst]
+	ms, ok := node.getActiveStream(dst)
 	if ok {
 		if func() bool {
 			ms.Lock.Lock()
@@ -374,14 +422,14 @@ func (node *Node) sendPacket(dst peer.ID, packet []byte, plen int) {
 			// If we encounter an error when writing to a stream we should
 			// close that stream and delete it from the active stream map.
 			(*ms.Stream).Close()
-			delete(node.activeStreams, dst)
+			node.expireActiveStream(dst)
 			return false
 		}() {
 			return
 		}
 	}
 
-	stream, err := node.p2p.NewStream(node.ctx, dst, p2p.Protocol)
+	stream, err := node.p2p.NewStream(node.ctx, dst, p2p.Protocols...)
 	if err != nil {
 		logger.With(zap.String("destination", dst.String()), zap.Error(err)).Error("Failed to open stream")
 		go p2p.Rediscover()
@@ -406,12 +454,7 @@ func (node *Node) sendPacket(dst peer.ID, packet []byte, plen int) {
 		return
 	}
 
-	// If all succeeds when writing the packet to the stream
-	// we should reuse this stream by adding it active streams map.
-	node.activeStreams[dst] = SharedStream{
-		Stream: &stream,
-		Lock:   &sync.Mutex{},
-	}
+	go node.streamHandler(stream)
 }
 
 func (node *Node) eventLogger(ctx context.Context, host host.Host) error {

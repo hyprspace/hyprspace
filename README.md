@@ -81,7 +81,7 @@ This will create a systemd service that runs `hyprspace up` with a generated con
 }
 ```
 
-Also take a look at the [configuration docs](https://docs.hyprspace.privatevoid.net/configuration.html).
+Also take a look at the [configuration docs](https://docs.hyprspace.privatevoid.net/options.html).
 
 ## Usage
 
@@ -245,7 +245,7 @@ Now to stop the interface and clean up the system, simply kill the proceses (for
 
 ## Hacking
 
-If you want to hack on Hyprspace, check out the [development docs](https://docs.hyprspace.privatevoid.net/Development.html) for a quick introduction.
+If you want to hack on Hyprspace, check out the [development docs](https://docs.hyprspace.privatevoid.net/development/hacking.html) for a quick introduction.
 
 ## Disclaimer & Copyright
 

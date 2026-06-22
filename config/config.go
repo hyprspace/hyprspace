@@ -22,6 +22,7 @@ type Config struct {
 	Path                   string                `json:"-"`
 	Interface              string                `json:"-"`
 	ListenAddresses        []multiaddr.Multiaddr `json:"-"`
+	BootstrapPeers         []multiaddr.Multiaddr `json:"-"`
 	Peers                  []Peer                `json:"peers"`
 	PeerLookup             PeerLookup            `json:"-"`
 	PrivateKey             crypto.PrivKey        `json:"-"`
@@ -199,6 +200,14 @@ func Read(path string) (*Config, error) {
 	result.Domain = input.Domain
 	if result.Domain == "" {
 		result.Domain = "hyprspace"
+  }
+
+	for _, addrString := range input.BootstrapPeers {
+		addr, err := multiaddr.NewMultiaddr(addrString)
+		if err != nil {
+			return nil, err
+		}
+		result.BootstrapPeers = append(result.BootstrapPeers, addr)
 	}
 
 	// Overwrite path of config to input.
@@ -246,6 +255,9 @@ func FindPeerByIDPrefix(peers []Peer, needle string) (*Peer, error) {
 // otherwise a peer ID prefix. Returns (nil, nil) on no match,
 // (nil, error) only on ambiguous ID prefix.
 func FindPeerByCLIRef(peers []Peer, needle string) (*Peer, error) {
+	if needle == "" {
+		return nil, nil
+	}
 	if strings.HasPrefix(needle, "@") {
 		name := strings.TrimPrefix(needle, "@")
 		p, _ := FindPeerByName(peers, name)

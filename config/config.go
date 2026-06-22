@@ -200,7 +200,7 @@ func Read(path string) (*Config, error) {
 	result.Domain = input.Domain
 	if result.Domain == "" {
 		result.Domain = "hyprspace"
-  }
+	}
 
 	for _, addrString := range input.BootstrapPeers {
 		addr, err := multiaddr.NewMultiaddr(addrString)

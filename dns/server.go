@@ -22,9 +22,6 @@ var logger = log.Logger("hyprspace/dns")
 
 func domainSuffix(config config.Config) string {
 	domain := config.Domain
-	if domain == "" {
-		domain = "hyprspace"
-	}
 	if config.Interface == "hyprspace" {
 		return domain + "."
 	}

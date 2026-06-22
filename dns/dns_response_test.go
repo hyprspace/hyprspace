@@ -22,7 +22,7 @@ func Test_domainSuffix(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.iface, func(t *testing.T) {
-			assert.Equal(t, tt.want, domainSuffix(config.Config{Interface: tt.iface}))
+			assert.Equal(t, tt.want, domainSuffix(config.Config{Interface: tt.iface, Domain: "hyprspace"}))
 		})
 	}
 }
@@ -37,13 +37,13 @@ func Test_withDomainSuffix(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.iface, func(t *testing.T) {
-			assert.Equal(t, tt.want, withDomainSuffix(config.Config{Interface: tt.iface}, tt.prefix))
+			assert.Equal(t, tt.want, withDomainSuffix(config.Config{Interface: tt.iface, Domain: "hyprspace"}, tt.prefix))
 		})
 	}
 }
 
 func Test_mkAliasRecord_emptyService(t *testing.T) {
-	cfg := config.Config{Interface: "hs0"}
+	cfg := config.Config{Interface: "hs0", Domain: "hyprspace"}
 	pk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
 	require.NoError(t, err)
 	pid, err := peer.IDFromPrivateKey(pk)
@@ -60,7 +60,7 @@ func Test_mkAliasRecord_emptyService(t *testing.T) {
 }
 
 func Test_mkAliasRecord_withService(t *testing.T) {
-	cfg := config.Config{Interface: "hs0"}
+	cfg := config.Config{Interface: "hs0", Domain: "hyprspace"}
 	pk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
 	require.NoError(t, err)
 	pid, err := peer.IDFromPrivateKey(pk)
@@ -74,7 +74,7 @@ func Test_mkAliasRecord_withService(t *testing.T) {
 }
 
 func Test_mkAliasRecord_emptyName(t *testing.T) {
-	cfg := config.Config{Interface: "hs0"}
+	cfg := config.Config{Interface: "hs0", Domain: "hyprspace"}
 	pk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
 	require.NoError(t, err)
 	pid, err := peer.IDFromPrivateKey(pk)
@@ -134,7 +134,7 @@ func Test_mkIDRecord(t *testing.T) {
 	for i, tt := range tests {
 		name := []string{"ipv4", "ipv6", "ipv6-svc"}[i]
 		t.Run(name, func(t *testing.T) {
-			cfg := config.Config{Interface: "hs0"}
+			cfg := config.Config{Interface: "hs0", Domain: "hyprspace"}
 			record := tt.fn(cfg, pid, "", tt.addr)
 
 			hdr := record.Header()
@@ -160,7 +160,7 @@ func Test_mkIDRecord(t *testing.T) {
 }
 
 func Test_mkIDRecord_nil_addr(t *testing.T) {
-	cfg := config.Config{Interface: "hs0"}
+	cfg := config.Config{Interface: "hs0", Domain: "hyprspace"}
 	pk, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
 	require.NoError(t, err)
 	pid, err := peer.IDFromPrivateKey(pk)

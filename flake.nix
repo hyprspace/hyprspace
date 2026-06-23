@@ -41,7 +41,9 @@
               { lib, pkgs, ... }:
               {
                 imports = [ ./nixos ];
-                services.hyprspace.package = lib.mkOptionDefault inputs.self.packages.${pkgs.system}.default;
+                services.hyprspace.package =
+                  lib.mkOptionDefault
+                    inputs.self.packages.${pkgs.stdenv.hostPlatform.system}.default;
               };
           };
         };

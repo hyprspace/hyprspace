@@ -5,3 +5,7 @@ result-*
 .data/
 *_generated.go
 .direnv/
+
+# tesh shell history
+tesh/.bash_history
+tests/tesh/.bash_history

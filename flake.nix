@@ -14,10 +14,6 @@
         flake-parts.follows = "flake-parts";
       };
     };
-    ndg = {
-      url = "github:feel-co/ndg";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
   };
 
   outputs =
@@ -68,7 +64,6 @@
             };
             docs = pkgs.callPackage ./docs/package.nix {
               hyprspace = config.packages.default;
-              inherit (inputs'.ndg.packages) ndg;
             };
             vendor = pkgs.callPackage ./dev/vendor.nix {
               generateSchemasProgram = config.apps.dev-generate-schemas.program;

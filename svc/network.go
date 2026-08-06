@@ -6,6 +6,7 @@ import (
 	"net/netip"
 
 	"github.com/hyprspace/hyprspace/config"
+	"github.com/hyprspace/hyprspace/internal/protocol"
 	"github.com/hyprspace/hyprspace/netstack"
 	hstun "github.com/hyprspace/hyprspace/tun"
 	"github.com/ipfs/go-log/v2"
@@ -93,7 +94,7 @@ func NewServiceNetwork(host host.Host, cfg *config.Config, tunDev *hstun.TUN) Se
 			netip.AddrFrom16([16]byte([]byte("\xfd\x00hyprspinternal"))),
 		},
 		[]netip.Addr{},
-		1420,
+		protocol.TunnelMTU,
 	)
 	if err != nil {
 		logger.With(err).Fatal("Failed to Create service-network tunnel device")
@@ -101,7 +102,7 @@ func NewServiceNetwork(host host.Host, cfg *config.Config, tunDev *hstun.TUN) Se
 
 	go func() {
 		sizes := make([]int, 1)
-		buffer := make([]byte, 1420)
+		buffer := make([]byte, protocol.MaxPacketSize)
 		buffers := make([][]byte, 1)
 		buffers[0] = buffer
 		for {

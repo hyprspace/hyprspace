@@ -377,6 +377,11 @@ func (node *Node) streamHandler(stream network.Stream) {
 
 		// Decode the incoming packet's size from binary.
 		size := binary.LittleEndian.Uint16(packetSize)
+		if int(size) > len(packet) {
+			logger.Errorf("Received packet size %d exceeds buffer size %d, closing stream", size, len(packet))
+			stream.Close()
+			return
+		}
 
 		// Read in the packet until completion.
 		var plen uint16 = 0

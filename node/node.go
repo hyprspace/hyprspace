@@ -378,6 +378,13 @@ func (node *Node) streamHandler(stream network.Stream) {
 		// Decode the incoming packet's size from binary.
 		size := binary.LittleEndian.Uint16(packetSize)
 
+		// Reject sizes that do not fit the fixed packet buffer instead of
+		// slicing out of range on a corrupt or malicious length.
+		if int(size) > len(packet) {
+			stream.Close()
+			return
+		}
+
 		// Read in the packet until completion.
 		var plen uint16 = 0
 		for plen < size {

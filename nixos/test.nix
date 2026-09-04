@@ -27,6 +27,7 @@ let
       services.hyprspace = {
         enable = true;
         inherit privateKeyFile;
+        logLevel = "debug";
         settings.peers = peers;
       };
       systemd.services.dummytun = {
@@ -74,9 +75,18 @@ pkgs.testers.nixosTest {
 
     for node in [peer1, peer2]:
         node.wait_for_unit("hyprspace.service")
+        node.succeed(
+            "systemctl show hyprspace.service --property=Environment --value "
+            "| grep -q 'HYPRSPACE_LOG_LEVEL=debug'"
+        )
 
         node.wait_until_succeeds(
             "${pkgs.iproute2}/bin/ip addr show hyprspace | grep -q 'inet 100\.64\.'",
+            timeout=10,
+        )
+        node.wait_until_succeeds(
+            "journalctl --unit=hyprspace.service "
+            "-g 'Setting up Node discovery via DHT' --quiet",
             timeout=10,
         )
 

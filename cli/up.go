@@ -13,6 +13,17 @@ import (
 
 var logger = log.Logger("hyprspace")
 
+func configureLogging() error {
+	logLevel := os.Getenv("HYPRSPACE_LOG_LEVEL")
+	if logLevel == "" {
+		logLevel = "info"
+	}
+	if err := log.SetLogLevel("hyprspace", logLevel); err != nil {
+		return err
+	}
+	return log.SetLogLevelRegex("^hyprspace/", logLevel)
+}
+
 // Up creates and brings up a Hyprspace Interface.
 var Up = cmd.Sub{
 	Name:  "up",
@@ -34,8 +45,7 @@ func UpRun(r *cmd.Root, c *cmd.Sub) {
 		configPath = "/etc/hyprspace/" + ifName + ".json"
 	}
 
-	log.SetLogLevel("hyprspace", "info")
-	log.SetLogLevelRegex("^hyprspace/", "info")
+	checkErr(configureLogging())
 
 	node := hsnode.New(context.Background(), configPath, ifName)
 	checkErr(node.Run())

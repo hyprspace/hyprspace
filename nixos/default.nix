@@ -70,6 +70,20 @@ in
       type = types.port;
       description = "Prometheus metrics endpoint port.";
     };
+
+    logLevel = mkOption {
+      type = types.enum [
+        "debug"
+        "info"
+        "warn"
+        "error"
+        "dpanic"
+        "panic"
+        "fatal"
+      ];
+      description = "Log level for Hyprspace subsystems.";
+      default = "info";
+    };
   };
 
   config = mkIf cfg.enable {
@@ -98,7 +112,10 @@ in
         ExecReload = "${lib.getExe' pkgs.coreutils "kill"} -USR1 $MAINPID";
       };
 
-      environment.HYPRSPACE_METRICS_PORT = maybeMetricsPort;
+      environment = {
+        HYPRSPACE_LOG_LEVEL = cfg.logLevel;
+        HYPRSPACE_METRICS_PORT = maybeMetricsPort;
+      };
     };
 
     networking.firewall = mkMerge (

@@ -33,7 +33,12 @@ func Test_MkServiceID_NonCommutative(t *testing.T) {
 	id2 := MkServiceID("ba")
 
 	assert.NotEqual(t, id1, id2, "MkServiceID should be non-commutative")
-	assert.Equal(t, [2]byte{0xff, 0x9c}, id1, "MkServiceID(\"ab\") should be [0xff, 0x9c]")
+	assert.Equal(t, [2]byte{0x9e, 0x3a}, id1, "MkServiceID(\"ab\") should be [0x9e, 0x3a]")
+}
+
+func Test_MkServiceID_FirstByteMatters(t *testing.T) {
+	assert.NotEqual(t, MkServiceID(""), MkServiceID("a"), "MkServiceID(\"a\") should differ from MkServiceID(\"\")")
+	assert.NotEqual(t, MkServiceID("a"), MkServiceID("b"), "MkServiceID(\"a\") should differ from MkServiceID(\"b\")")
 }
 
 func Test_MkBuiltinAddr6_DifferentPeers(t *testing.T) {

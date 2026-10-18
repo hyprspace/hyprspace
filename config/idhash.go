@@ -44,7 +44,7 @@ func MkNetID(p peer.ID) [4]byte {
 func MkServiceID(serviceName string) [2]byte {
 	var id = [2]byte{0xff, 0xfe}
 	for i, b := range []byte(serviceName) {
-		id[i%2] ^= b * byte(i)
+		id[i%2] ^= b * byte(i+1)
 	}
 	return id
 }
